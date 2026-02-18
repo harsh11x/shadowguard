@@ -588,7 +588,14 @@ Examples:
 
     subparsers.add_parser("network", help="Get live network status (JSON)")
 
+    addr_parser = subparsers.add_parser("address_info", help="Get on-chain info for an address")
+    addr_parser.add_argument("--address", required=True, metavar="ADDR", help="Ethereum address")
+
+    stream_parser = subparsers.add_parser("stream_transactions", help="Stream transactions from latest blocks")
+    stream_parser.add_argument("--limit", type=int, default=15, help="Max txs per block")
+
     return parser
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -772,6 +779,60 @@ def main():
         else:
             cmd_view_logs(args, db)
         return
+
+    if args.command == "address_info":
+        # Connect RPC for real on-chain data
+        provider = RPCProvider(rpc_url)
+        try:
+            from web3 import Web3
+            addr = Web3.to_checksum_address(args.address)
+            balance_wei = provider.get_balance(addr)
+            nonce = provider._call_with_retry("get_transaction_count", addr)
+            code = provider.get_code(addr)
+            code_size = len(code) if code else 0
+            emit_json({
+                "address": addr,
+                "balance_wei": balance_wei,
+                "balance_eth": round(balance_wei / 1e18, 6),
+                "nonce": nonce,
+                "code_size": code_size,
+                "is_contract": code_size > 0,
+            })
+        except Exception as e:
+            emit_json({"address": args.address, "error": str(e)})
+        return
+
+    if args.command == "stream_transactions":
+
+        provider = RPCProvider(rpc_url)
+        last_block = 0
+        while True:
+            try:
+                current_block = provider.get_block_number()
+                if current_block > last_block:
+                    start_b = last_block + 1 if last_block > 0 else current_block
+                    for b_num in range(start_b, current_block + 1):
+                        block = provider._call_with_retry("get_block", b_num, True)
+                        if not block: continue
+                        txs = block.get('transactions', [])
+                        # Emit each transaction
+                        for tx in txs[:args.limit]:
+                            emit_json({
+                                "type": "transaction",
+                                "hash": tx['hash'].hex() if hasattr(tx['hash'], 'hex') else tx['hash'],
+                                "from": tx['from'],
+                                "to": tx['to'],
+                                "value_eth": float(provider.w3.from_wei(tx['value'], 'ether')),
+                                "gas": tx['gas'],
+                                "block": b_num,
+                                "timestamp": block.get('timestamp')
+                            })
+                    last_block = current_block
+            except Exception as e:
+                emit_json({"type": "stream_error", "error": str(e)})
+            time.sleep(4) # Block time is ~12s, 4s polling is safe
+        return
+
 
     if args.command == "set_policy":
         cmd_set_policy(args, policy)

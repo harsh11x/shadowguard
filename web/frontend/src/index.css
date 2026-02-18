@@ -901,3 +901,224 @@ input[type="range"]::-webkit-slider-thumb {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Dashboard & Stats ─────────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  padding: 20px;
+  text-align: left;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.stat-sub {
+  font-size: 0.65rem;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.risk-bar-track {
+  background: var(--border);
+  height: 8px;
+  overflow: hidden;
+}
+
+.risk-bar-fill {
+  height: 100%;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.risk-bar-fill.LOW {
+  background: var(--green);
+}
+
+.risk-bar-fill.MEDIUM {
+  background: var(--yellow);
+}
+
+.risk-bar-fill.HIGH {
+  background: var(--orange);
+}
+
+.risk-bar-fill.CRITICAL {
+  background: var(--red);
+}
+
+/* ── Form Enhancements ───────────────────────────────────────────────────── */
+.field.span-2 {
+  grid-column: span 2;
+}
+
+.preset-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  border-color: var(--yellow);
+  color: var(--white);
+}
+
+.preset-btn.active {
+  background: var(--yellow);
+  color: var(--black);
+  border-color: var(--yellow);
+  font-weight: 700;
+}
+
+/* ── Toggle Switch ───────────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.toggle-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.toggle-sub {
+  font-size: 0.72rem;
+  color: var(--dim);
+}
+
+.toggle {
+  width: 44px;
+  height: 22px;
+  background: var(--border);
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  background: var(--white);
+  transition: transform 0.2s;
+}
+
+.toggle.on {
+  background: var(--green);
+}
+
+.toggle.on::after {
+  transform: translateX(22px);
+}
+
+/* ── Live Stream Extras ─────────────────────────────────────────────────── */
+.pulse-red {
+  display: inline-block;
+  color: #ff3333;
+  margin-left: 8px;
+  animation: pulse-opac 1.5s infinite;
+}
+
+@keyframes pulse-opac {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.pulse-slow {
+  animation: pulse-opac 3s infinite;
+}
+
+.live-tx-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+
+.live-tx-row:hover {
+  background: rgba(255, 107, 0, 0.05);
+  /* Stealth subtle highlight */
+}
+
+.tx-hash-pill {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--yellow);
+  background: rgba(245, 230, 66, 0.1);
+  padding: 2px 6px;
+  cursor: help;
+}
+
+.addr-pill {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--white);
+  opacity: 0.8;
+}
+
+.badge-creation {
+  background: var(--blue, #33ccff);
+  color: var(--black);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 4px;
+}
+
+.btn-small {
+  background: transparent;
+  border: 1px solid var(--border-hi);
+  color: var(--white);
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-small:hover {
+  background: var(--white);
+  color: var(--black);
+}
+
+/* ── Loading Spinner ────────────────────────────────────────────────────── */
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--orange);
+  animation: spin 1s linear infinite;
+}

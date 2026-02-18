@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import Simulate from './pages/Simulate.jsx'
 import History from './pages/History.jsx'
 import Policy from './pages/Policy.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Inspector from './pages/Inspector.jsx'
+import Live from './pages/Live.jsx'
+
 
 function NetworkBar() {
     const [net, setNet] = useState(null)
@@ -16,21 +20,24 @@ function NetworkBar() {
                 .catch(() => setLoading(false))
         }
         fetch_()
-        const id = setInterval(fetch_, 15000)
+        const id = setInterval(fetch_, 12000)
         return () => clearInterval(id)
     }, [])
 
     return (
         <div className="network-pill">
-            <div className={`dot ${!net ? 'offline' : ''}`} />
+            <div className={`dot ${!net || net.error ? 'offline' : ''}`} />
             {loading ? (
                 <span className="dim">Connecting…</span>
             ) : net && !net.error ? (
                 <>
-                    <span className="dim">SEPOLIA</span>
+                    <span className="dim">MAINNET</span>
+
                     <span>#{net.block?.toLocaleString()}</span>
                     <span className="dim">|</span>
                     <span>{net.gas_price_gwei?.toFixed(2)} Gwei</span>
+                    <span className="dim">|</span>
+                    <span className="good" style={{ fontSize: '0.65rem' }}>● LIVE</span>
                 </>
             ) : (
                 <span className="bad">RPC Offline</span>
@@ -40,10 +47,12 @@ function NetworkBar() {
 }
 
 function Sidebar() {
-    const loc = useLocation()
     const nav = [
-        { to: '/', icon: '⬡', label: 'Simulate' },
+        { to: '/live', icon: '◈', label: 'Live Stream', pulse: true },
+        { to: '/dashboard', icon: '◈', label: 'Dashboard' },
+        { to: '/', icon: '⬡', label: 'Simulate', end: true },
         { to: '/history', icon: '▤', label: 'History' },
+        { to: '/inspector', icon: '⬢', label: 'Inspector' },
         { to: '/policy', icon: '⚙', label: 'Policy' },
     ]
     return (
@@ -54,21 +63,32 @@ function Sidebar() {
                     <NavLink
                         key={n.to}
                         to={n.to}
-                        end={n.to === '/'}
+                        end={n.end}
                         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                     >
-                        <span className="nav-icon">{n.icon}</span>
+                        <span className={`nav-icon ${n.pulse ? 'pulse-slow' : ''}`}>{n.icon}</span>
                         {n.label}
                     </NavLink>
                 ))}
             </div>
+
             <div className="sidebar-section">
                 <div className="sidebar-label">Network</div>
                 <div style={{ padding: '0 8px', fontSize: '0.72rem', color: 'var(--dim)', lineHeight: 1.8 }}>
-                    <div>Ethereum Sepolia</div>
-                    <div>Chain ID: 11155111</div>
+                    <div>Ethereum Mainnet</div>
+                    <div>Chain ID: 1</div>
                     <div>Engine: Python 3</div>
                     <div>Bridge: Node.js SSE</div>
+                </div>
+            </div>
+
+            <div className="sidebar-section">
+                <div className="sidebar-label">Quick Links</div>
+                <div style={{ padding: '0 8px', fontSize: '0.7rem', lineHeight: 2 }}>
+                    <a href="https://etherscan.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)', textDecoration: 'none' }}>⬡ Etherscan ↗</a><br />
+
+                    <a href="/api/health" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)', textDecoration: 'none' }}>⬡ API Health ↗</a><br />
+                    <a href="/api/export?format=csv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)', textDecoration: 'none' }}>⬡ Export CSV ↗</a>
                 </div>
             </div>
         </aside>
@@ -84,7 +104,7 @@ function App() {
                         <div className="header-logo-mark">SG</div>
                         <div>
                             <div className="header-logo-text">SHADOWGUARD</div>
-                            <div className="header-logo-sub">Pre-Execution Security Proxy</div>
+                            <div className="header-logo-sub">Pre-Execution Security Proxy · Ethereum Sepolia</div>
                         </div>
                     </NavLink>
                     <NetworkBar />
@@ -94,10 +114,14 @@ function App() {
                     <main>
                         <Routes>
                             <Route path="/" element={<Simulate />} />
+                            <Route path="/live" element={<Live />} />
+                            <Route path="/dashboard" element={<Dashboard />} />
                             <Route path="/history" element={<History />} />
+                            <Route path="/inspector" element={<Inspector />} />
                             <Route path="/policy" element={<Policy />} />
                         </Routes>
                     </main>
+
                 </div>
             </div>
         </BrowserRouter>

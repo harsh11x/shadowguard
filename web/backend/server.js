@@ -17,6 +17,8 @@ const statsRouter = require('./routes/stats');
 const addressRouter = require('./routes/address');
 const exportRouter = require('./routes/export');
 const batchRouter = require('./routes/batch');
+const liveRouter = require('./routes/live');
+
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -40,6 +42,8 @@ app.use('/api/stats', statsRouter);
 app.use('/api/address', addressRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/batch', batchRouter);
+app.use('/api/live', liveRouter);
+
 
 
 // ── Health check ──────────────────────────────────────────────────────────────
