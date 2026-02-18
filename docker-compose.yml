@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3001:3001"
+    environment:
+      - ETH_RPC_URL=${ETH_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}
+      - DB_PATH=/app/data/shadowguard.db
+      - POLICY_FILE=/app/data/policy.json
+    volumes:
+      - ./data:/app/data
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: web/frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  data:

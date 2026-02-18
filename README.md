@@ -54,6 +54,36 @@ npm run dev
 
 ---
 
+## 🐳 Docker Deployment
+
+The entire project is containerized using Docker and Docker Compose. This includes the Python simulation engine, the Express backend, and the React frontend.
+
+### Prerequisites
+- Docker
+- Docker Compose
+
+### Fast Start
+1. **Clone the repository** (if not already done).
+2. **Run the production stack**:
+   ```bash
+   docker-compose up --build
+   ```
+3. **Access the application**:
+   - Frontend: `http://localhost`
+   - API Backend: `http://localhost:3001`
+
+### Service Breakdown
+- **Backend (Node + Python)**: Runs on port `3001`. It contains the Express API and the Python simulation core.
+- **Frontend (Nginx + React)**: Runs on port `80`. It serves the production build of the React app and proxies `/api` calls to the backend.
+- **Data Persistence**: A local `./data` directory is mapped to the containers to persist the SQLite database and policies.
+
+### Environment Variables
+You can customize the deployment using environment variables in a `.env` file at the root:
+- `ETH_RPC_URL`: Primary Ethereum RPC endpoint.
+- `API_PORT`: Port for the backend API.
+
+---
+
 ## Quick Start
 
 ### Prerequisites

@@ -1,0 +1,10 @@
+node_modules
+.git
+__pycache__
+*.db
+*.log
+web/frontend/dist
+web/frontend/node_modules
+web/backend/node_modules
+.env
+.DS_Store
