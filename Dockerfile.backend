@@ -1,32 +1,42 @@
-# Backend Dockerfile - Node.js + Python
-FROM node:20-slim
+# Backend Dockerfile - Hybrid Python + Node
+FROM python:3.11-slim
 
-# Install Python and dependencies
+# Install Node.js 20 and common build tools
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
+    curl \
+    gnupg \
+    build-essential \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy python requirements first for caching
+# Copy python requirements first
 COPY requirements.txt .
-# Filter requirements.txt to remove customtkinter (GUI)
+# Remove GUI dependencies for headless container
 RUN sed -i '/customtkinter/d' requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt --break-system-packages
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy backend package files
 COPY web/backend/package*.json ./web/backend/
-RUN cd web/backend && npm install
+RUN cd web/backend && npm install --production
 
-# Copy the rest of the code
-COPY . .
+# Copy core engine and backend source
+COPY core ./core
+COPY rpc ./rpc
+COPY models ./models
+COPY storage ./storage
+COPY utils ./utils
+COPY config.py main.py .env.template ./
+COPY web/backend ./web/backend
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV PYTHON_BIN=python3
 ENV API_PORT=3001
+ENV DB_PATH=/app/data/shadowguard.db
+ENV POLICY_FILE=/app/data/policy.json
 
 EXPOSE 3001
 

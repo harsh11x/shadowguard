@@ -95,7 +95,15 @@ function spawnStream(args, onLine, onClose) {
 
     proc.stderr.on('data', () => { }); // suppress stderr noise
 
+    const timeout = setTimeout(() => {
+        if (!proc.killed) {
+            proc.kill();
+            onClose(-1);
+        }
+    }, 45000); // 45s safety timeout
+
     proc.on('close', (code) => {
+        clearTimeout(timeout);
         // Flush remaining buffer
         if (buffer.trim()) {
             try { onLine(JSON.parse(buffer.trim())); } catch { }
@@ -103,7 +111,7 @@ function spawnStream(args, onLine, onClose) {
         onClose(code);
     });
 
-    return { kill: () => proc.kill() };
+    return { kill: () => { clearTimeout(timeout); proc.kill(); } };
 }
 
 module.exports = { runPython, spawnStream, PYTHON_ROOT };

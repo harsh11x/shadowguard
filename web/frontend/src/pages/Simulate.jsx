@@ -2,11 +2,10 @@ import { useState, useRef, useCallback } from 'react'
 
 const PRESETS = [
     { label: 'ETH Transfer', from: '0x0000000000000000000000000000000000000001', to: '0x0000000000000000000000000000000000000002', value: '0.01', data: '0x' },
-    { label: 'WETH', from: '0x0000000000000000000000000000000000000001', to: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9', value: '0', data: '0x' },
-    { label: 'USDC', from: '0x0000000000000000000000000000000000000001', to: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', value: '0', data: '0x' },
-    { label: 'Aave V3', from: '0x0000000000000000000000000000000000000001', to: '0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951', value: '0', data: '0x' },
-    { label: 'Uniswap', from: '0x0000000000000000000000000000000000000001', to: '0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008', value: '0', data: '0x' },
+    { label: 'Uniswap Swap', from: '0x0000000000000000000000000000000000000001', to: '0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008', value: '0', data: '0x3593badf000000000000000000000000000000000000000000000000000000000000012c000000000000000000000000000000000000000000000005d21db9e2400000000000' },
     { label: 'High Drain', from: '0x0000000000000000000000000000000000000001', to: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9', value: '1.5', data: '0x' },
+    { label: 'Aave Supply', from: '0x0000000000000000000000000000000000000001', to: '0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951', value: '0', data: '0x617ba0370000000000000000000000007b79995e5f793a07bc00c21412e50ecae098e7f9000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000' },
+    { label: 'Permit2 Drain', from: '0x0000000000000000000000000000000000000001', to: '0x000000000022D473030F116dDEE9F6B43aC78BA3', value: '0', data: '0x2b68b1910000000000000000000000000000000000000000000000000000000000000040...invalid...hex' },
 ]
 
 const STEP_LABELS = [
@@ -168,8 +167,26 @@ export default function Simulate() {
         })
     }, [])
 
+    const validate = () => {
+        const addrRegex = /^0x[a-fA-F0-9]{40}$/
+        const hexRegex = /^0x[a-fA-F0-9]*$/
+
+        if (!addrRegex.test(form.from)) return 'Invalid sender address'
+        if (!addrRegex.test(form.to)) return 'Invalid recipient address'
+        if (isNaN(parseFloat(form.value)) || parseFloat(form.value) < 0) return 'Invalid value'
+        if (!hexRegex.test(form.data)) return 'Invalid hex data'
+        return null
+    }
+
     const runSimulation = async () => {
         if (running) return
+
+        const err = validate()
+        if (err) {
+            setError(err)
+            return
+        }
+
         setRunning(true)
         setSteps([])
         setResult(null)
@@ -183,6 +200,8 @@ export default function Simulate() {
         esRef.current = controller
 
         try {
+            updateStep(0, 'running', { status: 'Connecting to engine...' })
+
             const res = await fetch('/api/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -226,6 +245,7 @@ export default function Simulate() {
             if (e.name !== 'AbortError') setError(e.message)
         } finally {
             setRunning(false)
+            setSteps(prev => prev.filter(s => s.step !== 0))
         }
     }
 
