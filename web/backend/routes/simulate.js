@@ -36,17 +36,17 @@ router.post('/', (req, res) => {
     ];
     if (gas) args.push('--gas', String(gas));
 
-    send({ type: 'start', message: 'Simulation started' });
-
     const handle = spawnStream(
         args,
         (line) => {
             // Forward every JSON line from Python to the SSE client
             send(line);
         },
-        (code) => {
-            if (code !== 0) {
+        (code, signal) => {
+            if (code !== 0 && code !== null) {
                 send({ type: 'error', message: `Python process exited with code ${code}` });
+            } else if (signal) {
+                send({ type: 'error', message: `Python process killed by signal ${signal}` });
             }
             send({ type: 'done' });
             res.end();

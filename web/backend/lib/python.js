@@ -47,11 +47,15 @@ function runPython(args) {
             }
         });
 
-        proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+        proc.stderr.on('data', (chunk) => {
+            const msg = chunk.toString();
+            stderr += msg;
+            console.error(`[python-stderr] ${msg}`);
+        });
 
-        proc.on('close', (code) => {
+        proc.on('close', (code, signal) => {
             if (code !== 0 && lines.length === 0) {
-                reject(new Error(`Python exited ${code}: ${stderr.slice(0, 500)}`));
+                reject(new Error(`Python exited ${code || signal}: ${stderr.slice(0, 500)}`));
             } else {
                 resolve(lines);
             }
@@ -93,22 +97,24 @@ function spawnStream(args, onLine, onClose) {
         }
     });
 
-    proc.stderr.on('data', () => { }); // suppress stderr noise
+    proc.stderr.on('data', (chunk) => {
+        console.error(`[python-stream-stderr] ${chunk.toString()}`);
+    });
 
     const timeout = setTimeout(() => {
         if (!proc.killed) {
-            proc.kill();
-            onClose(-1);
+            proc.kill('SIGKILL');
+            onClose(-1, 'TIMEOUT');
         }
-    }, 45000); // 45s safety timeout
+    }, 60000); // 60s safety timeout for slow RPCs
 
-    proc.on('close', (code) => {
+    proc.on('close', (code, signal) => {
         clearTimeout(timeout);
         // Flush remaining buffer
         if (buffer.trim()) {
             try { onLine(JSON.parse(buffer.trim())); } catch { }
         }
-        onClose(code);
+        onClose(code, signal);
     });
 
     return { kill: () => { clearTimeout(timeout); proc.kill(); } };

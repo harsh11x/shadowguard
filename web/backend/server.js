@@ -18,8 +18,14 @@ const app = express();
 const PORT = process.env.API_PORT || 3001;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+app.use(cors()); // Allow all in demo environment for simplicity
 app.use(express.json());
+
+// Request logger
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+});
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/simulate', simulateRouter);
@@ -43,7 +49,7 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: err.message });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n  ██████╗ SHADOWGUARD API`);
     console.log(`  ██╔══██╗ Port: ${PORT}`);
     console.log(`  ██████╔╝ http://localhost:${PORT}/api/health`);

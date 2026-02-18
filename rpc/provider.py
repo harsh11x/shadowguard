@@ -63,11 +63,22 @@ class RPCProvider:
                     self._connect_with_fallback()
                 
                 target = getattr(self.w3.eth, fn_name)
-                return target(*args, **kwargs)
+                if callable(target):
+                    return target(*args, **kwargs)
+                return target
             
+            except ContractLogicError:
+                # Expected logic errors (reverts) should not be retried or trigger fallback
+                raise
             except Exception as e:
                 err_msg = str(e).lower()
-                is_transient = "429" in err_msg or "timeout" in err_msg or "too many requests" in err_msg
+                # Transaction-specific errors (not infrastructure failures)
+                is_logic_error = any(m in err_msg for m in ["insufficient funds", "intrinsic gas too low", "nonce too low", "gas limit exceeded"])
+                
+                if is_logic_error:
+                    raise
+
+                is_transient = any(m in err_msg for m in ["429", "timeout", "too many requests", "rate limit"])
                 
                 if is_transient and attempt < MAX_RETRIES:
                     wait = (attempt + 1) * 2
@@ -149,14 +160,13 @@ class RPCProvider:
     def estimate_gas(self, tx: Dict[str, Any]) -> int:
         """Estimate gas for a transaction."""
         try:
-            return self.w3.eth.estimate_gas(tx)
-        except Exception as e:
-            logger.warning(f"estimate_gas failed: {e}")
+            return self._call_with_retry("estimate_gas", tx)
+        except Exception:
             return config.DEFAULT_GAS_LIMIT
 
     def eth_call(self, tx: Dict[str, Any], block: str = "latest") -> bytes:
         """Execute eth_call simulation — returns raw return bytes."""
-        return self.w3.eth.call(tx, block)
+        return self._call_with_retry("call", tx, block)
 
     def debug_trace_call(self, tx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
