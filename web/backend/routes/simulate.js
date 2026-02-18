@@ -53,8 +53,8 @@ router.post('/', (req, res) => {
         }
     );
 
-    // Clean up if client disconnects
-    req.on('close', () => handle.kill());
+    // Clean up if client disconnects (use res, not req — req 'close' fires when body is consumed)
+    res.on('close', () => handle.kill());
 });
 
 module.exports = router;

@@ -13,6 +13,10 @@ const simulateRouter = require('./routes/simulate');
 const historyRouter = require('./routes/history');
 const policyRouter = require('./routes/policy');
 const networkRouter = require('./routes/network');
+const statsRouter = require('./routes/stats');
+const addressRouter = require('./routes/address');
+const exportRouter = require('./routes/export');
+const batchRouter = require('./routes/batch');
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -32,6 +36,11 @@ app.use('/api/simulate', simulateRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/policy', policyRouter);
 app.use('/api/network', networkRouter);
+app.use('/api/stats', statsRouter);
+app.use('/api/address', addressRouter);
+app.use('/api/export', exportRouter);
+app.use('/api/batch', batchRouter);
+
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

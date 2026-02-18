@@ -1,7 +1,7 @@
 """
 SHADOWGUARD Shadow Execution Engine
 Simulates transactions using eth_call without broadcasting to the network.
-Returns REAL gas used, REAL return data, and REAL trace data from the chain.
+Returns REAL gas used, REAL return data from the chain.
 """
 
 import logging
@@ -27,7 +27,6 @@ class ShadowExecutor:
         """
         Simulate a transaction without broadcasting.
         Uses eth_call for execution result and eth_estimateGas for real gas.
-        Returns actual on-chain data — no synthetic values.
         """
         tx = {
             "from":  request.sender,
@@ -53,16 +52,17 @@ class ShadowExecutor:
             revert_reason = self._extract_revert_reason(str(e))
             logger.info(f"Transaction reverted: {revert_reason}")
         except Exception as e:
+            # eth_call failed (e.g. insufficient funds, bad params) — treat as reverted
             reverted = True
             revert_reason = str(e)[:200]
             logger.warning(f"eth_call failed: {e}")
 
         # ── Step B: eth_estimateGas — get REAL gas used ───────────────────────
-        # This is the actual gas the EVM would consume, not a guess.
         gas_used = self._get_real_gas(tx, request.gas_limit, reverted)
 
-        # ── Step C: debug_traceCall — get call tree if node supports it ───────
-        trace = self._get_trace(tx)
+        # NOTE: debug_traceCall is intentionally skipped — it is not supported
+        # by any public Sepolia RPC node and would cause a timeout.
+        trace = None
 
         elapsed_ms = (time.time() - start_time) * 1000
 
@@ -79,41 +79,26 @@ class ShadowExecutor:
 
         logger.info(
             f"Shadow execution: success={success} reverted={reverted} "
-            f"gas_used={gas_used} time={elapsed_ms:.1f}ms trace={'yes' if trace else 'no'}"
+            f"gas_used={gas_used} time={elapsed_ms:.1f}ms"
         )
         return result
 
     def _get_real_gas(self, tx: Dict[str, Any], gas_limit: int, reverted: bool) -> int:
         """
         Get real gas consumption via eth_estimateGas.
-        This is the actual EVM gas cost — not a heuristic.
+        Falls back to a reasonable estimate if the call fails.
         """
         if reverted:
             # Reverted txs consume all gas up to the limit
             return gas_limit
 
         try:
-            # eth_estimateGas returns the exact gas the EVM would use
             estimated = self.provider.estimate_gas(tx)
             logger.debug(f"Real gas from eth_estimateGas: {estimated}")
             return estimated
         except Exception as e:
             logger.warning(f"eth_estimateGas failed, using 50% of limit: {e}")
             return int(gas_limit * 0.5)
-
-    def _get_trace(self, tx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Attempt to get execution trace via debug_traceCall.
-        Many public nodes don't support this — we handle it gracefully.
-        """
-        try:
-            trace = self.provider.debug_trace_call(tx)
-            if trace:
-                logger.debug("Execution trace obtained via debug_traceCall")
-            return trace
-        except Exception as e:
-            logger.debug(f"debug_traceCall unavailable (node may not support it): {e}")
-            return None
 
     def _extract_revert_reason(self, error_str: str) -> str:
         """Extract human-readable revert reason from error string."""

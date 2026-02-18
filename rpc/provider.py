@@ -37,7 +37,7 @@ class RPCProvider:
         for url in candidates:
             try:
                 # Use a shorter timeout for initial connection
-                w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": 5}))
+                w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": 3}))
                 if not w3.is_connected():
                     raise ConnectionError("is_connected() returned False")
                 
@@ -81,7 +81,7 @@ class RPCProvider:
                 is_transient = any(m in err_msg for m in ["429", "timeout", "too many requests", "rate limit"])
                 
                 if is_transient and attempt < MAX_RETRIES:
-                    wait = (attempt + 1) * 2
+                    wait = attempt + 1  # 1s, 2s (was 2s, 4s)
                     logger.warning(f"Transient RPC error ({fn_name}): {e}. Retrying in {wait}s...")
                     time.sleep(wait)
                     continue
