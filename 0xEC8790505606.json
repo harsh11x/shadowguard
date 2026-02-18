@@ -1,0 +1,66 @@
+{
+  "simulation_id": "0xEC8790505606",
+  "timestamp": "2026-02-18T13:23:28.549123+00:00",
+  "request": {
+    "sender": "0x0000000000000000000000000000000000000001",
+    "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+    "value_wei": 0,
+    "data": "0xa9059cbb00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000de0b6b3a7640000",
+    "gas_limit": 26812,
+    "simulation_id": "0xEC8790505606",
+    "timestamp": "2026-02-18T13:23:28.549123+00:00"
+  },
+  "result": {
+    "success": true,
+    "return_data": "0x",
+    "gas_used": 22344,
+    "gas_limit": 26812,
+    "reverted": false,
+    "revert_reason": null,
+    "execution_time_ms": 2836.7552757263184
+  },
+  "state_diff": {
+    "sender_balance_delta_wei": -670320000000000,
+    "receiver_balance_delta_wei": 0,
+    "sender_drain_pct": 0.7172266210142801,
+    "ownership_changed": false,
+    "storage_changes": {},
+    "code_changed": false,
+    "block_delta": 0
+  },
+  "opcode_profile": {
+    "selfdestruct_count": 0,
+    "delegatecall_count": 0,
+    "callcode_count": 0,
+    "create2_count": 0,
+    "create_count": 0,
+    "sstore_count": 0,
+    "call_count": 0,
+    "has_dangerous_opcodes": false,
+    "risk_opcodes": [],
+    "bytecode_size": 0
+  },
+  "behavior_report": {
+    "nested_call_depth": 0,
+    "gas_anomaly": true,
+    "gas_usage_pct": 83.33581978218709,
+    "external_interactions": 0,
+    "storage_write_count": 0,
+    "static_call_count": 0,
+    "behavior_flags": [
+      "Gas usage anomaly: 83.3% of limit consumed"
+    ]
+  },
+  "risk_report": {
+    "score": 15,
+    "level": "LOW",
+    "triggered_rules": [
+      "Gas anomaly: 83.3% of limit consumed (+15)"
+    ],
+    "recommendation": "Transaction appears safe. Proceed with standard caution.",
+    "policy_violations": [],
+    "deterministic_hash": "6e10aa9954c454f11e7c523c55d72c5c3887b16dc7a8343b8a07c8fe40f3d0b5"
+  },
+  "execution_time_s": 7.858644247055054,
+  "deterministic_hash": "6e10aa9954c454f11e7c523c55d72c5c3887b16dc7a8343b8a07c8fe40f3d0b5"
+}

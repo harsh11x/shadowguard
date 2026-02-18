@@ -1,0 +1,18 @@
+{
+    "name": "shadowguard-backend",
+    "version": "1.0.0",
+    "description": "SHADOWGUARD Express.js API — bridges Node.js to Python engine",
+    "main": "server.js",
+    "scripts": {
+        "dev": "npx nodemon server.js",
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^4.18.2",
+        "dotenv": "^16.3.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.2"
+    }
+}

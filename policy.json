@@ -1,0 +1,8 @@
+{
+  "max_drain": 20.0,
+  "disallow_selfdestruct": true,
+  "disallow_delegatecall": false,
+  "max_nested_calls": 3,
+  "min_block_score": 0,
+  "policy_version": 4
+}

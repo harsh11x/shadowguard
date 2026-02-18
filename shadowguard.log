@@ -1,0 +1,97 @@
+2026-02-18T17:16:38 [INFO    ] rpc.provider: Connected to chain_id=80002, block=34132892, rpc=https://rpc-amoy.polygon.technology
+2026-02-18T17:16:40 [INFO    ] core.interceptor: Intercepted transaction: id=0xE51D8729711E from=0x00000000... to=0x00000000... value=1000000000000000 gas=25470
+2026-02-18T17:16:47 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=21225 time=2913.6ms
+2026-02-18T17:16:48 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=0 storage_writes=0
+2026-02-18T17:16:48 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T17:16:48 [INFO    ] storage.database: Simulation saved: 0xE51D8729711E
+2026-02-18T17:17:03 [INFO    ] core.policy_engine: Policy saved to policy.json
+2026-02-18T17:17:03 [INFO    ] core.policy_engine: Policy updated: max_drain=20.0
+2026-02-18T17:17:03 [INFO    ] core.policy_engine: Policy saved to policy.json
+2026-02-18T17:17:03 [INFO    ] core.policy_engine: Policy updated: disallow_selfdestruct=True
+2026-02-18T17:17:03 [INFO    ] core.policy_engine: Policy saved to policy.json
+2026-02-18T17:17:03 [INFO    ] core.policy_engine: Policy updated: max_nested_calls=3
+2026-02-18T17:17:10 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T17:17:11 [INFO    ] rpc.provider: Connected to chain_id=80002, block=34132925, rpc=https://rpc-amoy.polygon.technology
+2026-02-18T17:17:12 [INFO    ] core.interceptor: Intercepted transaction: id=0xE51D8729711E from=0x00000000... to=0x00000000... value=1000000000000000 gas=25470
+2026-02-18T17:17:19 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=21225 time=2795.1ms
+2026-02-18T17:17:19 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=0 storage_writes=0
+2026-02-18T17:17:19 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T17:17:19 [INFO    ] storage.database: Simulation saved: 0xE51D8729711E
+2026-02-18T18:38:57 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T18:41:01 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T18:41:03 [INFO    ] rpc.provider: Connected to chain_id=80002, block=34137957, rpc=https://rpc-amoy.polygon.technology
+2026-02-18T18:41:49 [WARNING ] rpc.provider: estimate_gas failed: {'code': -32000, 'message': 'failed with 33554432 gas: insufficient funds for gas * price + value: address 0x0000000000000000000000000000000000000001 have 93460000000007497 want 100000000000000000'}
+2026-02-18T18:41:49 [INFO    ] core.interceptor: Intercepted transaction: id=0xCDBF4CE9E320 from=0x00000000... to=0x00000000... value=100000000000000000 gas=3000000
+2026-02-18T18:41:58 [WARNING ] core.shadow_executor: eth_call failed: {'code': -32000, 'message': 'err: insufficient funds for gas * price + value: address 0x0000000000000000000000000000000000000001 have 93460000000007497 want 100000000000000000 (supplied gas 3000000)'}
+2026-02-18T18:41:58 [INFO    ] core.shadow_executor: Shadow execution complete: success=False reverted=True gas_used=2850000 time=2932.9ms
+2026-02-18T18:41:59 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=3 gas_anomaly=True external=2 storage_writes=3
+2026-02-18T18:41:59 [INFO    ] core.risk_engine: Risk assessment: score=55/100 level=HIGH rules_triggered=2
+2026-02-18T18:41:59 [INFO    ] storage.database: Simulation saved: 0xCDBF4CE9E320
+2026-02-18T18:42:17 [WARNING ] rpc.provider: estimate_gas failed: {'code': -32000, 'message': 'failed with 33554432 gas: insufficient funds for gas * price + value: address 0x0000000000000000000000000000000000000001 have 93460000000007497 want 1000000000000000000'}
+2026-02-18T18:42:17 [INFO    ] core.interceptor: Intercepted transaction: id=0xD9609C5EE837 from=0x00000000... to=0x00000000... value=1000000000000000000 gas=3000000
+2026-02-18T18:42:26 [WARNING ] core.shadow_executor: eth_call failed: {'code': -32000, 'message': 'err: insufficient funds for gas * price + value: address 0x0000000000000000000000000000000000000001 have 93460000000007497 want 1000000000000000000 (supplied gas 3000000)'}
+2026-02-18T18:42:27 [INFO    ] core.shadow_executor: Shadow execution complete: success=False reverted=True gas_used=2850000 time=3093.0ms
+2026-02-18T18:42:28 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=3 gas_anomaly=True external=2 storage_writes=3
+2026-02-18T18:42:28 [INFO    ] core.risk_engine: Risk assessment: score=55/100 level=HIGH rules_triggered=2
+2026-02-18T18:42:28 [INFO    ] storage.database: Simulation saved: 0xD9609C5EE837
+2026-02-18T18:52:22 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T18:52:24 [INFO    ] rpc.provider: Connected to chain_id=80002, block=34138638, rpc=https://rpc-amoy.polygon.technology
+2026-02-18T18:52:58 [INFO    ] core.interceptor: Intercepted transaction: id=0xEC8790505606 from=0x00000000... to=0x2791Bca1... value=0 gas=26812
+2026-02-18T18:53:05 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=22344 time=3139.8ms
+2026-02-18T18:53:05 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=0 storage_writes=0
+2026-02-18T18:53:05 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T18:53:05 [INFO    ] storage.database: Simulation saved: 0xEC8790505606
+2026-02-18T18:53:13 [INFO    ] core.interceptor: Intercepted transaction: id=0xEC8790505606 from=0x00000000... to=0x2791Bca1... value=0 gas=26812
+2026-02-18T18:53:20 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=22344 time=3621.8ms
+2026-02-18T18:53:21 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=0 storage_writes=0
+2026-02-18T18:53:21 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T18:53:21 [INFO    ] storage.database: Simulation saved: 0xEC8790505606
+2026-02-18T18:53:28 [INFO    ] core.interceptor: Intercepted transaction: id=0xEC8790505606 from=0x00000000... to=0x2791Bca1... value=0 gas=26812
+2026-02-18T18:53:34 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=22344 time=2836.8ms
+2026-02-18T18:53:35 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=0 storage_writes=0
+2026-02-18T18:53:35 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T18:53:35 [INFO    ] storage.database: Simulation saved: 0xEC8790505606
+2026-02-18T18:57:24 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T18:57:25 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286117 rpc=https://ethereum-sepolia-rpc.publicnode.com
+2026-02-18T18:57:27 [INFO    ] core.interceptor: Intercepted transaction: id=0x4F39BF5C8275 from=0x00000000... to=0x7b79995e... value=0 gas=31006
+2026-02-18T18:57:33 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=25839 time=3011.8ms
+2026-02-18T18:57:33 [INFO    ] core.opcode_analyzer: Opcode analysis: size=1786 dangerous=False selfdestruct=0 delegatecall=0 sstore=6
+2026-02-18T18:57:33 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=1 storage_writes=0
+2026-02-18T18:57:33 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T18:57:33 [INFO    ] storage.database: Simulation saved: 0x4F39BF5C8275
+2026-02-18T19:01:24 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T19:01:26 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286135 rpc=https://ethereum-sepolia-rpc.publicnode.com
+2026-02-18T19:01:30 [INFO    ] core.interceptor: Intercepted transaction: id=0x4F39BF5C8275 from=0x00000000... to=0x7b79995e... value=0 gas=31006
+2026-02-18T19:02:30 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T19:02:31 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286140 rpc=https://ethereum-sepolia-rpc.publicnode.com
+2026-02-18T19:02:34 [INFO    ] core.interceptor: Intercepted transaction: id=0x4F39BF5C8275 from=0x00000000... to=0x7b79995e... value=0 gas=31006
+2026-02-18T19:02:41 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=25839 time=3585.0ms
+2026-02-18T19:02:41 [INFO    ] core.opcode_analyzer: Opcode analysis: size=1786 dangerous=False selfdestruct=0 delegatecall=0 sstore=6
+2026-02-18T19:02:41 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=1 storage_writes=0
+2026-02-18T19:02:41 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T19:02:41 [INFO    ] storage.database: Simulation saved: 0x4F39BF5C8275
+2026-02-18T19:03:56 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T19:03:58 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286147 rpc=https://ethereum-sepolia-rpc.publicnode.com
+2026-02-18T19:13:23 [INFO    ] core.interceptor: Intercepted transaction: id=0xCDBF4CE9E320 from=0x00000000... to=0x00000000... value=100000000000000000 gas=25470
+2026-02-18T19:13:29 [INFO    ] core.shadow_executor: Shadow execution complete: success=True reverted=False gas_used=21225 time=2886.3ms
+2026-02-18T19:13:29 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True external=1 storage_writes=0
+2026-02-18T19:13:29 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T19:13:29 [INFO    ] storage.database: Simulation saved: 0xCDBF4CE9E320
+2026-02-18T19:18:55 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T19:18:57 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286216 rpc=https://ethereum-sepolia-rpc.publicnode.com
+2026-02-18T19:19:00 [INFO    ] core.interceptor: Intercepted transaction: id=0x4A2BC6833849 from=0x00000000... to=0x7b79995e... value=0 gas=31006
+2026-02-18T19:19:09 [INFO    ] core.shadow_executor: Shadow execution: success=True reverted=False gas_used=25839 time=5102.1ms trace=yes
+2026-02-18T19:19:11 [INFO    ] core.opcode_analyzer: Opcode analysis: size=1786 dangerous=False selfdestruct=0 delegatecall=0 sstore=6
+2026-02-18T19:19:11 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True gas_pct=83.3% external=1 storage_writes=0
+2026-02-18T19:19:11 [INFO    ] core.risk_engine: Risk assessment: score=15/100 level=LOW rules_triggered=1
+2026-02-18T19:19:11 [INFO    ] storage.database: Simulation saved: 0x4A2BC6833849
+2026-02-18T19:19:41 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T19:19:43 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286220 rpc=https://ethereum-sepolia-rpc.publicnode.com
+2026-02-18T19:19:46 [INFO    ] core.interceptor: Intercepted transaction: id=0xCC1B788481F0 from=0x00000000... to=0x7b79995e... value=1500000000000000000 gas=54115
+2026-02-18T19:19:53 [INFO    ] core.shadow_executor: Shadow execution: success=True reverted=False gas_used=45096 time=3208.6ms trace=yes
+2026-02-18T19:19:54 [INFO    ] core.opcode_analyzer: Opcode analysis: size=1786 dangerous=False selfdestruct=0 delegatecall=0 sstore=6
+2026-02-18T19:19:54 [INFO    ] core.behavior_analyzer: Behavior analysis: depth=0 gas_anomaly=True gas_pct=83.3% external=1 storage_writes=0
+2026-02-18T19:19:54 [INFO    ] core.risk_engine: Risk assessment: score=55/100 level=HIGH rules_triggered=2
+2026-02-18T19:19:54 [INFO    ] storage.database: Simulation saved: 0xCC1B788481F0
+2026-02-18T19:31:42 [INFO    ] core.policy_engine: Policy loaded from policy.json (v4)
+2026-02-18T19:31:45 [INFO    ] rpc.provider: Connected: chain_id=11155111 block=10286276 rpc=https://ethereum-sepolia-rpc.publicnode.com
