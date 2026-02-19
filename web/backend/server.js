@@ -21,6 +21,7 @@ const batchRouter = require('./routes/batch');
 const liveRouter = require('./routes/live');
 const developerRouter = require('./routes/developer');
 const v1Router = require('./routes/v1');
+const { router: authRouter } = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -45,6 +46,9 @@ app.use('/api/address', addressRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/batch', batchRouter);
 app.use('/api/live', liveRouter);
+
+// ── Auth (signup / login / me) ────────────────────────────────────────────────
+app.use('/api/auth', authRouter);
 
 // ── Developer Portal / Key Management ────────────────────────────────────────
 app.use('/api/developer', developerRouter);

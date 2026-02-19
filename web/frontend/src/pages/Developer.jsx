@@ -1,49 +1,10 @@
 /**
  * Developer Portal — API Key Management
- * Features:
- *  - Google + Email/Password Firebase Auth
- *  - Create, reveal (once), copy, delete API keys
- *  - Usage dashboard per key
- *  - Tiered pricing table
- *  - Integration code examples (curl, Node.js, Python)
+ * Uses simple backend JWT auth (no Firebase required)
  */
 
 import { useState, useEffect } from 'react'
-import { initializeApp, getApps } from 'firebase/app'
-import {
-    getAuth,
-    signInWithPopup,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    GoogleAuthProvider,
-    onAuthStateChanged,
-    signOut,
-} from 'firebase/auth'
 
-// ── Firebase init ─────────────────────────────────────────────────────────────
-const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-key",
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "shadowguard-demo.firebaseapp.com",
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "shadowguard-demo",
-}
-
-// ── Firebase lazy init (safe — won't crash app if config is missing) ──────────
-let _auth = null
-let _googleProvider = null
-
-function getFirebaseAuth() {
-    if (_auth) return _auth
-    try {
-        const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-        _auth = getAuth(firebaseApp)
-        _googleProvider = new GoogleAuthProvider()
-    } catch (e) {
-        console.warn('[Developer] Firebase init failed:', e.message)
-    }
-    return _auth
-}
-
-// ── Plans ─────────────────────────────────────────────────────────────────────
 const PLANS = [
     { id: 'demo', name: 'Demo', requests: '100 / month', price: 'Free', color: '#10b981', highlight: false, cta: 'Current Plan' },
     { id: 'starter', name: 'Starter', requests: '1,000 / month', price: '$20', period: '/month', color: '#3b82f6', highlight: false, cta: 'Get Started' },
@@ -60,519 +21,321 @@ const CODE_EXAMPLES = {
     "to":   "0xCONTRACT_ADDRESS",
     "value": 0,
     "data": "0xa9059cbb...",
-    "network": "ethereum"
+    "gas": 200000
   }'`,
+    node: `import fetch from 'node-fetch'
 
-    node: `const { EventSource } = require('eventsource')
-
-const stream = new EventSource(
-  'https://api.shadowguard.io/api/v1/simulate',
-  {
-    method: 'POST',
-    headers: {
-      'X-API-Key': 'YOUR_API_KEY',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: '0xYOUR_ADDRESS',
-      to:   '0xCONTRACT_ADDRESS',
-      value: 0,
-      data:  '0xa9059cbb...',
-    }),
-  }
-)
-
-stream.onmessage = ({ data }) => {
-  const event = JSON.parse(data)
-  if (event.type === 'result') {
-    console.log('Risk score:', event.risk_score)
-    console.log('Verdict:', event.verdict)
-  }
-  if (event.type === 'done') stream.close()
-}`,
-
-    python: `import requests, json
+const resp = await fetch('https://api.shadowguard.io/api/v1/simulate', {
+  method: 'POST',
+  headers: {
+    'X-API-Key': 'YOUR_API_KEY',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    from:  '0xYOUR_ADDRESS',
+    to:    '0xCONTRACT_ADDRESS',
+    value: 0,
+    data:  '0xa9059cbb...',
+    gas:   200000,
+  }),
+})
+const result = await resp.json()
+console.log(result.risk_level, result.threats)`,
+    python: `import requests
 
 resp = requests.post(
     "https://api.shadowguard.io/api/v1/simulate",
-    headers={
-        "X-API-Key": "YOUR_API_KEY",
-        "Content-Type": "application/json",
-    },
+    headers={"X-API-Key": "YOUR_API_KEY"},
     json={
-        "from":    "0xYOUR_ADDRESS",
-        "to":      "0xCONTRACT_ADDRESS",
-        "value":   0,
-        "data":    "0xa9059cbb...",
-        "network": "ethereum",
+        "from":  "0xYOUR_ADDRESS",
+        "to":    "0xCONTRACT_ADDRESS",
+        "value": 0,
+        "data":  "0xa9059cbb...",
+        "gas":   200000,
     },
-    stream=True
 )
-
-for line in resp.iter_lines():
-    if line.startswith(b"data:"):
-        event = json.loads(line[5:])
-        if event.get("type") == "result":
-            print("Risk:", event["risk_score"])
-            print("Verdict:", event["verdict"])`,
+print(resp.json()["risk_level"], resp.json()["threats"])`,
 }
 
-// ── Risk badge ────────────────────────────────────────────────────────────────
-function RiskBadge({ score }) {
-    const pct = Math.min(score, 100)
-    const color = pct >= 70 ? '#ef4444' : pct >= 50 ? '#f59e0b' : pct >= 30 ? '#eab308' : '#10b981'
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ flex: 1, height: 4, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2 }} />
-            </div>
-            <span style={{ fontSize: '0.65rem', color, minWidth: 28 }}>{pct}%</span>
-        </div>
-    )
-}
+// ── Auth token storage ─────────────────────────────────────────────────────────
+const TOKEN_KEY = 'sg_dev_token'
+const getToken = () => localStorage.getItem(TOKEN_KEY)
+const setToken = (t) => localStorage.setItem(TOKEN_KEY, t)
+const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 
-// ── Auth gate ─────────────────────────────────────────────────────────────────
-function AuthGate({ onUser }) {
-    const [mode, setMode] = useState('login')
+// ── Auth form component ────────────────────────────────────────────────────────
+function AuthForm({ onUser }) {
+    const [mode, setMode] = useState('login') // 'login' | 'signup'
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
-    const [error, setError] = useState('')
+    const [name, setName] = useState('')
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
 
-    const handleGoogle = async () => {
-        setLoading(true); setError('')
-        try {
-            const result = await signInWithPopup(getFirebaseAuth(), _googleProvider)
-            onUser(result.user)
-        } catch (e) { setError(e.message) } finally { setLoading(false) }
-    }
-
-    const handleEmail = async (e) => {
+    const submit = async (e) => {
         e.preventDefault()
         setLoading(true); setError('')
         try {
-            const fn = mode === 'login' ? signInWithEmailAndPassword : createUserWithEmailAndPassword
-            const result = await fn(auth, email, password)
-            onUser(result.user)
-        } catch (e) { setError(e.message.replace('Firebase:', '').trim()) } finally { setLoading(false) }
+            const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login'
+            const body = mode === 'signup' ? { email, password, name } : { email, password }
+            const resp = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+            const data = await resp.json()
+            if (!resp.ok) throw new Error(data.error || 'Authentication failed')
+            setToken(data.token)
+            onUser(data.user, data.token)
+        } catch (e) { setError(e.message) } finally { setLoading(false) }
     }
 
     return (
-        <div className="portal-auth-wrap">
-            <div className="card" style={{ maxWidth: 420, margin: '0 auto', padding: 40 }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 24 }}>
+            <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: '2rem', width: '100%', maxWidth: 440 }}>
+                <h2 style={{ marginBottom: 4, fontSize: '1.4rem', fontWeight: 800 }}>
                     {mode === 'login' ? 'Sign In' : 'Create Account'}
                 </h2>
-                <p style={{ color: 'var(--dim)', fontSize: '0.82rem', marginBottom: 28 }}>
-                    to access your API keys and dashboard
+                <p style={{ color: 'var(--dim)', fontSize: '0.82rem', marginBottom: '1.5rem' }}>
+                    Developer Portal — API Key Management
                 </p>
 
-                <button onClick={handleGoogle} disabled={loading} className="btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-                    Continue with Google
-                </button>
+                {error && <div style={{ background: '#ff000015', border: '1px solid #ff000060', color: '#ff6b6b', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>{error}</div>}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0', color: 'var(--dim)', fontSize: '0.75rem' }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                    or
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                </div>
-
-                <form onSubmit={handleEmail} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <input className="input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-                    <input className="input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
-                    {error && <div style={{ color: 'var(--bad)', fontSize: '0.78rem', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>}
-                    <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: 4 }}>
-                        {loading ? 'Signing in…' : mode === 'login' ? 'Sign In' : 'Create Account'}
+                <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {mode === 'signup' && (
+                        <input
+                            placeholder="Display name (optional)"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            style={{ padding: '0.75rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', width: '100%', boxSizing: 'border-box' }}
+                        />
+                    )}
+                    <input
+                        type="email"
+                        placeholder="Email address"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        required
+                        style={{ padding: '0.75rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', width: '100%', boxSizing: 'border-box' }}
+                    />
+                    <input
+                        type="password"
+                        placeholder={mode === 'signup' ? 'Password (min 6 chars)' : 'Password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        required
+                        style={{ padding: '0.75rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', width: '100%', boxSizing: 'border-box' }}
+                    />
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        style={{ padding: '0.85rem', background: 'var(--accent)', color: '#000', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '0.9rem', opacity: loading ? 0.6 : 1 }}
+                    >
+                        {loading ? '...' : mode === 'signup' ? 'Create Account' : 'Sign In'}
                     </button>
                 </form>
 
-                <p style={{ textAlign: 'center', color: 'var(--dim)', fontSize: '0.78rem', marginTop: 20 }}>
-                    {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
-                    <button style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-                        {mode === 'login' ? 'Sign up' : 'Sign in'}
-                    </button>
+                <p style={{ marginTop: '1rem', fontSize: '0.82rem', color: 'var(--dim)', textAlign: 'center' }}>
+                    {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
+                    <span onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError('') }} style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 700 }}>
+                        {mode === 'login' ? 'Sign Up' : 'Sign In'}
+                    </span>
                 </p>
             </div>
         </div>
     )
 }
 
-// ── Key card ──────────────────────────────────────────────────────────────────
-function KeyCard({ keyData, revealedKey, onDelete, onReveal }) {
-    const [copied, setCopied] = useState(false)
-    const usagePct = keyData.plan === 'enterprise' ? 0 :
-        Math.min((keyData.usage_count / { demo: 100, starter: 1000, professional: 10000 }[keyData.plan]) * 100, 100)
-
-    const copy = (text) => {
-        navigator.clipboard.writeText(text)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-    }
-
-    return (
-        <div className="card" style={{ padding: '20px 24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: 4 }}>{keyData.name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--dim)', background: 'var(--bg)', padding: '3px 8px', border: '1px solid var(--border)' }}>
-                            {revealedKey || `${keyData.key_prefix}••••••••••••••••••••`}
-                        </span>
-                        {revealedKey
-                            ? <button onClick={() => copy(revealedKey)} className="btn btn-sm btn-ghost" style={{ fontSize: '0.7rem' }}>{copied ? '✓ Copied' : 'Copy'}</button>
-                            : <button onClick={() => onReveal(keyData.id)} className="btn btn-sm btn-ghost" style={{ fontSize: '0.7rem' }}>Reveal (once)</button>
-                        }
-                    </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '3px 10px', border: '1px solid var(--border)', color: 'var(--dim)', letterSpacing: '0.08em' }}>{keyData.plan.toUpperCase()}</span>
-                    <button onClick={() => onDelete(keyData.id)} className="btn btn-sm btn-ghost" style={{ color: 'var(--bad)', fontSize: '0.7rem' }}>Delete</button>
-                </div>
-            </div>
-
-            <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: '0.7rem', color: 'var(--dim)' }}>
-                    <span>Usage this month</span>
-                    <span>{keyData.usage_count.toLocaleString()} / {keyData.plan === 'enterprise' ? '∞' : { demo: '100', starter: '1,000', professional: '10,000' }[keyData.plan]}</span>
-                </div>
-                <RiskBadge score={usagePct} />
-            </div>
-
-            <div style={{ marginTop: 12, fontSize: '0.68rem', color: 'var(--dim)' }}>
-                Created {new Date(keyData.created_at).toLocaleDateString()} ·
-                {keyData.last_used_at ? ` Last used ${new Date(keyData.last_used_at).toLocaleDateString()}` : ' Never used'}
-            </div>
-        </div>
-    )
-}
-
-// ── Main Developer page ───────────────────────────────────────────────────────
+// ── Main Developer portal ──────────────────────────────────────────────────────
 export default function Developer() {
     const [user, setUser] = useState(null)
+    const [token, setTokenState] = useState(null)
     const [loadingAuth, setLoadingAuth] = useState(true)
+    const [tab, setTab] = useState('keys')
     const [keys, setKeys] = useState([])
-    const [loadingKeys, setLoadingKeys] = useState(false)
     const [newKeyName, setNewKeyName] = useState('')
     const [newKeyPlan, setNewKeyPlan] = useState('demo')
-    const [creating, setCreating] = useState(false)
-    const [revealedKeys, setRevealedKeys] = useState({}) // id → rawKey (only stored momentarily)
-    const [activeTab, setActiveTab] = useState('keys') // keys | pricing | docs
-    const [codeTab, setCodeTab] = useState('curl')
+    const [revealedKey, setRevealedKey] = useState(null) // { id, raw }
+    const [copiedId, setCopiedId] = useState(null)
+    const [example, setExample] = useState('curl')
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
 
     useEffect(() => {
-        const firebaseAuth = getFirebaseAuth()
-        if (!firebaseAuth) { setLoadingAuth(false); return }
-        const unsub = onAuthStateChanged(firebaseAuth, (u) => {
-            setUser(u)
-            setLoadingAuth(false)
-        })
-        return unsub
+        const stored = getToken()
+        if (!stored) { setLoadingAuth(false); return }
+        // Verify token with backend
+        fetch('/api/auth/me', { headers: { Authorization: `Bearer ${stored}` } })
+            .then(r => r.json())
+            .then(d => {
+                if (d.user) { setUser(d.user); setTokenState(stored) }
+                else clearToken()
+            })
+            .catch(() => clearToken())
+            .finally(() => setLoadingAuth(false))
     }, [])
 
-    useEffect(() => {
-        if (user) fetchKeys()
-    }, [user])
+    const onUser = (u, t) => { setUser(u); setTokenState(t) }
 
-    const getIdToken = async () => {
-        if (!user) throw new Error('Not signed in')
-        return user.getIdToken()
-    }
+    const authHeader = () => ({ Authorization: `Bearer ${token}` })
 
     const fetchKeys = async () => {
-        setLoadingKeys(true)
         try {
-            const token = await getIdToken()
-            const res = await fetch('/api/developer/keys', { headers: { Authorization: `Bearer ${token}` } })
-            const data = await res.json()
-            if (res.ok) setKeys(data.keys || [])
-            else setError(data.error)
-        } catch (e) { setError(e.message) } finally { setLoadingKeys(false) }
-    }
-
-    const createKey = async (e) => {
-        e.preventDefault()
-        if (!newKeyName.trim()) return
-        setCreating(true); setError(''); setSuccess('')
-        try {
-            const token = await getIdToken()
-            const res = await fetch('/api/developer/keys', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newKeyName, plan: newKeyPlan }),
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error)
-            // Store the raw key — it's shown once only
-            setRevealedKeys(prev => ({ ...prev, [data.prefix]: data.key }))
-            setSuccess(`API key created! Copy it now — it won't be shown again.`)
-            setNewKeyName('')
-            await fetchKeys()
-            // Find the new key id
-            setTimeout(() => {
-                setRevealedKeys(prev => {
-                    const updated = { ...prev }
-                    // We'll match by prefix in KeyCard
-                    return updated
-                })
-            }, 30000) // Auto-hide after 30s
-        } catch (e) { setError(e.message) } finally { setCreating(false) }
-    }
-
-    const deleteKey = async (id) => {
-        if (!confirm('Permanently delete this API key? This cannot be undone.')) return
-        try {
-            const token = await getIdToken()
-            const res = await fetch(`/api/developer/keys/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error)
-            setSuccess('API key deleted.')
-            await fetchKeys()
+            const r = await fetch('/api/developer/keys', { headers: authHeader() })
+            const d = await r.json()
+            if (r.ok) setKeys(d.keys || [])
         } catch (e) { setError(e.message) }
     }
 
-    const revealKey = (id) => {
-        // The key is only shown once during creation in revealedKeys
-        // For security, we don't allow re-reveal — user must delete and recreate
-        alert('For security, the key can only be revealed once on creation.\nDelete this key and create a new one if you need to access it again.')
+    useEffect(() => { if (user && token) fetchKeys() }, [user, token])
+
+    const createKey = async () => {
+        if (!newKeyName.trim()) return setError('Key name is required')
+        setError(''); setSuccess('')
+        try {
+            const r = await fetch('/api/developer/keys', {
+                method: 'POST',
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newKeyName, plan: newKeyPlan }),
+            })
+            const d = await r.json()
+            if (!r.ok) throw new Error(d.error || 'Failed to create key')
+            setRevealedKey({ id: d.key.id, raw: d.raw_key })
+            setNewKeyName(''); setSuccess('API key created! Copy it now — it won\'t be shown again.')
+            fetchKeys()
+        } catch (e) { setError(e.message) }
     }
 
-    if (loadingAuth) {
-        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--dim)' }}>Loading…</div>
+    const deleteKey = async (id) => {
+        if (!confirm('Delete this API key? This cannot be undone.')) return
+        try {
+            const r = await fetch(`/api/developer/keys/${id}`, { method: 'DELETE', headers: authHeader() })
+            if (r.ok) { fetchKeys(); if (revealedKey?.id === id) setRevealedKey(null) }
+        } catch (e) { setError(e.message) }
     }
 
-    if (!user) {
-        return (
-            <div style={{ padding: '48px 24px' }}>
-                <div style={{ maxWidth: 600, margin: '0 auto 40px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', letterSpacing: '0.15em', color: 'var(--accent)', marginBottom: 12, fontFamily: 'monospace' }}>DEVELOPER PORTAL</div>
-                    <h1 style={{ fontSize: '2.4rem', fontWeight: 800, lineHeight: 1.1, marginBottom: 16 }}>Integrate SHADOWGUARD<br />into your stack</h1>
-                    <p style={{ color: 'var(--dim)', fontSize: '0.95rem', lineHeight: 1.6 }}>
-                        Get an API key, run pre-execution simulations in your own pipeline, and protect your users from malicious transactions.
-                    </p>
-                </div>
-                <AuthGate onUser={setUser} />
-            </div>
-        )
+    const copyText = (text, id) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedId(id); setTimeout(() => setCopiedId(null), 2000)
+        })
     }
+
+    if (loadingAuth) return <div style={{ padding: '3rem', color: 'var(--dim)' }}>Loading…</div>
+    if (!user) return <AuthForm onUser={onUser} />
+
+    const cardStyle = { background: 'var(--surface)', border: '2px solid var(--border)', padding: '1.25rem', marginBottom: 12 }
+    const btnStyle = (bg = 'var(--accent)', col = '#000') => ({ padding: '0.5rem 1rem', background: bg, color: col, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' })
 
     return (
-        <div style={{ padding: '32px 24px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ padding: '1.5rem', maxWidth: 900 }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 36, flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <div>
                     <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 4 }}>Developer Portal</h1>
                     <p style={{ color: 'var(--dim)', fontSize: '0.82rem' }}>{user.email}</p>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => { const a = getFirebaseAuth(); if (a) signOut(a).then(() => setUser(null)) }}>Sign Out</button>
+                <button style={btnStyle('transparent', 'var(--dim)')} onClick={() => { clearToken(); setUser(null); setKeys([]) }}>Sign Out</button>
             </div>
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 32, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+            <div style={{ display: 'flex', gap: 2, marginBottom: '1.5rem', borderBottom: '2px solid var(--border)' }}>
                 {[['keys', 'API Keys'], ['pricing', 'Pricing'], ['docs', 'Integration']].map(([id, label]) => (
-                    <button key={id} onClick={() => setActiveTab(id)} style={{
-                        padding: '10px 20px', fontWeight: 600, fontSize: '0.82rem', border: 'none', background: 'none',
-                        cursor: 'pointer', color: activeTab === id ? 'var(--fg)' : 'var(--dim)',
-                        borderBottom: activeTab === id ? '2px solid var(--accent)' : '2px solid transparent',
-                        marginBottom: -1,
-                    }}>{label}</button>
+                    <button key={id} onClick={() => setTab(id)} style={{ padding: '0.6rem 1.2rem', background: tab === id ? 'var(--accent)' : 'transparent', color: tab === id ? '#000' : 'var(--dim)', border: 'none', cursor: 'pointer', fontWeight: tab === id ? 800 : 500, fontSize: '0.85rem' }}>{label}</button>
                 ))}
             </div>
 
-            {/* Alerts */}
-            {error && (
-                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '10px 16px', marginBottom: 20, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
-                    {error} <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>×</button>
-                </div>
-            )}
-            {success && (
-                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', padding: '10px 16px', marginBottom: 20, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
-                    {success} <button onClick={() => setSuccess('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10b981' }}>×</button>
-                </div>
-            )}
+            {error && <div style={{ background: '#ff000015', border: '1px solid #ff000060', color: '#ff6b6b', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>{error} <span style={{ cursor: 'pointer', float: 'right' }} onClick={() => setError('')}>✕</span></div>}
+            {success && <div style={{ background: '#10b98115', border: '1px solid #10b98160', color: '#10b981', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>{success} <span style={{ cursor: 'pointer', float: 'right' }} onClick={() => setSuccess('')}>✕</span></div>}
 
-            {/* ── API KEYS TAB ── */}
-            {activeTab === 'keys' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 28, alignItems: 'start' }}>
-                    <div>
-                        <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 20 }}>Your API Keys</h2>
-                        {loadingKeys ? (
-                            <div style={{ color: 'var(--dim)', fontSize: '0.82rem' }}>Loading keys…</div>
-                        ) : keys.length === 0 ? (
-                            <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '2rem', marginBottom: 12 }}>🔑</div>
-                                <p style={{ color: 'var(--dim)', fontSize: '0.85rem' }}>No API keys yet. Create your first key to get started.</p>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                {keys.map(k => (
-                                    <KeyCard
-                                        key={k.id}
-                                        keyData={k}
-                                        revealedKey={Object.entries(revealedKeys).find(([prefix]) => k.key_prefix?.startsWith(prefix))?.[1] || null}
-                                        onDelete={deleteKey}
-                                        onReveal={revealKey}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Create key panel */}
-                    <div className="card" style={{ padding: 24, position: 'sticky', top: 24 }}>
-                        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 20 }}>Create New Key</h3>
-                        <form onSubmit={createKey} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                            <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--dim)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>KEY NAME</label>
-                                <input
-                                    className="input"
-                                    style={{ width: '100%' }}
-                                    placeholder="e.g. My DeFi App"
-                                    value={newKeyName}
-                                    onChange={e => setNewKeyName(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--dim)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>PLAN</label>
-                                <select className="input" style={{ width: '100%' }} value={newKeyPlan} onChange={e => setNewKeyPlan(e.target.value)}>
-                                    <option value="demo">Demo — 100 req/mo (Free)</option>
-                                    <option value="starter">Starter — 1,000 req/mo ($20)</option>
-                                    <option value="professional">Professional — 10,000 req/mo ($60)</option>
-                                    <option value="enterprise">Enterprise — Unlimited (Contact us)</option>
-                                </select>
-                            </div>
-                            <button type="submit" className="btn btn-primary" disabled={creating} style={{ marginTop: 4 }}>
-                                {creating ? 'Creating…' : 'Generate API Key'}
-                            </button>
-                            <p style={{ fontSize: '0.7rem', color: 'var(--dim)', lineHeight: 1.5 }}>
-                                ⚠ Your full key is shown only once on creation. Store it securely.
-                            </p>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ── PRICING TAB ── */}
-            {activeTab === 'pricing' && (
+            {/* ── Keys Tab ───────────────────────────────────────────────────── */}
+            {tab === 'keys' && (
                 <div>
-                    <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 8 }}>Simple, Transparent Pricing</h2>
-                        <p style={{ color: 'var(--dim)', fontSize: '0.9rem' }}>Start free. Scale as your needs grow.</p>
+                    {/* Create key */}
+                    <div style={cardStyle}>
+                        <h3 style={{ marginBottom: '1rem', fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Create New API Key</h3>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <input
+                                placeholder="Key name (e.g. production-monitor)"
+                                value={newKeyName}
+                                onChange={e => setNewKeyName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && createKey()}
+                                style={{ flex: 1, minWidth: 200, padding: '0.65rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                            />
+                            <select value={newKeyPlan} onChange={e => setNewKeyPlan(e.target.value)} style={{ padding: '0.65rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                                {PLANS.filter(p => p.id !== 'enterprise').map(p => <option key={p.id} value={p.id}>{p.name} — {p.requests}</option>)}
+                            </select>
+                            <button style={btnStyle()} onClick={createKey}>Generate Key</button>
+                        </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
-                        {PLANS.map(plan => (
-                            <div key={plan.id} className="card" style={{
-                                padding: '28px 24px',
-                                border: plan.highlight ? `2px solid ${plan.color}` : '1px solid var(--border)',
-                                position: 'relative',
-                                display: 'flex', flexDirection: 'column',
-                            }}>
-                                {plan.highlight && (
-                                    <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: plan.color, color: '#fff', fontSize: '0.62rem', fontWeight: 800, padding: '3px 12px', letterSpacing: '0.1em' }}>MOST POPULAR</div>
-                                )}
-                                <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', color: plan.color, marginBottom: 12 }}>{plan.name.toUpperCase()}</div>
-                                <div style={{ marginBottom: 16 }}>
-                                    <span style={{ fontSize: '2rem', fontWeight: 900 }}>{plan.price}</span>
-                                    {plan.period && <span style={{ color: 'var(--dim)', fontSize: '0.82rem' }}>{plan.period}</span>}
-                                </div>
-                                <div style={{ fontSize: '0.82rem', color: 'var(--dim)', marginBottom: 24, flex: 1 }}>
-                                    <div style={{ marginBottom: 8 }}>✓ {plan.requests}</div>
-                                    <div style={{ marginBottom: 8 }}>✓ SSE streaming</div>
-                                    <div style={{ marginBottom: 8 }}>✓ Multi-chain support</div>
-                                    {plan.id !== 'demo' && <div style={{ marginBottom: 8 }}>✓ Priority support</div>}
-                                    {(plan.id === 'professional' || plan.id === 'enterprise') && <div>✓ Dedicated SLA</div>}
-                                </div>
-                                <button
-                                    className="btn"
-                                    style={{ background: plan.highlight ? plan.color : 'none', border: `1px solid ${plan.color}`, color: plan.highlight ? '#fff' : plan.color, fontWeight: 700, fontSize: '0.78rem' }}
-                                    onClick={() => plan.id === 'enterprise' ? window.open('mailto:enterprise@shadowguard.io') : setActiveTab('keys')}
-                                >{plan.cta}</button>
+
+                    {/* Reveal box */}
+                    {revealedKey && (
+                        <div style={{ ...cardStyle, borderColor: '#10b981', background: '#10b98110' }}>
+                            <p style={{ fontSize: '0.75rem', color: '#10b981', marginBottom: 8, fontWeight: 700 }}>⚠ COPY NOW — shown only once</p>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <code style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all', color: '#10b981' }}>{revealedKey.raw}</code>
+                                <button style={btnStyle('#10b981')} onClick={() => copyText(revealedKey.raw, 'revealed')}>
+                                    {copiedId === 'revealed' ? 'Copied!' : 'Copy'}
+                                </button>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Key list */}
+                    {keys.length === 0 ? (
+                        <div style={{ ...cardStyle, color: 'var(--dim)', textAlign: 'center', padding: '2rem' }}>No API keys yet. Create your first key above.</div>
+                    ) : keys.map(k => (
+                        <div key={k.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                            <div>
+                                <span style={{ fontWeight: 700, marginRight: 8 }}>{k.name}</span>
+                                <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: 'var(--accent)', color: '#000', fontWeight: 700, marginRight: 8 }}>{k.plan?.toUpperCase()}</span>
+                                <code style={{ fontSize: '0.75rem', color: 'var(--dim)' }}>{k.key_prefix}••••</code>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.78rem', color: 'var(--dim)' }}>
+                                <span>{k.request_count || 0} requests</span>
+                                {k.last_used_at && <span>last used {new Date(k.last_used_at).toLocaleDateString()}</span>}
+                                <button style={btnStyle('#ff000020', '#ff6b6b')} onClick={() => deleteKey(k.id)}>Delete</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ── Pricing Tab ────────────────────────────────────────────────── */}
+            {tab === 'pricing' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                    {PLANS.map(p => (
+                        <div key={p.id} style={{ ...cardStyle, border: `2px solid ${p.highlight ? p.color : 'var(--border)'}`, position: 'relative' }}>
+                            {p.highlight && <div style={{ position: 'absolute', top: -1, right: 12, background: p.color, color: '#000', fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px' }}>POPULAR</div>}
+                            <div style={{ color: p.color, fontWeight: 800, marginBottom: 8 }}>{p.name}</div>
+                            <div style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 4 }}>{p.price}<span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--dim)' }}>{p.period}</span></div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--dim)', marginBottom: '1rem' }}>{p.requests}</div>
+                            <button style={{ ...btnStyle(p.highlight ? p.color : 'transparent', p.highlight ? '#000' : 'var(--dim)'), width: '100%', border: `1px solid ${p.color}` }}>{p.cta}</button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ── Docs Tab ───────────────────────────────────────────────────── */}
+            {tab === 'docs' && (
+                <div>
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+                        {Object.keys(CODE_EXAMPLES).map(k => (
+                            <button key={k} style={btnStyle(example === k ? 'var(--accent)' : 'var(--border)', example === k ? '#000' : 'var(--text)')} onClick={() => setExample(k)}>{k}</button>
                         ))}
                     </div>
-                </div>
-            )}
-
-            {/* ── DOCS TAB ── */}
-            {activeTab === 'docs' && (
-                <div style={{ maxWidth: 800 }}>
-                    <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8 }}>Integration Guide</h2>
-                    <p style={{ color: 'var(--dim)', fontSize: '0.85rem', marginBottom: 28, lineHeight: 1.6 }}>
-                        The ShadowGuard API uses Server-Sent Events (SSE) for streaming simulation results in real time.
-                        Replace <code style={{ color: 'var(--accent)' }}>YOUR_API_KEY</code> with your generated key.
-                    </p>
-
-                    <div style={{ marginBottom: 28 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>Base URL</div>
-                        <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', padding: '10px 16px', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--accent)' }}>
-                            https://api.shadowguard.io/api/v1
-                        </div>
+                    <div style={{ position: 'relative', ...cardStyle }}>
+                        <pre style={{ margin: 0, fontSize: '0.78rem', overflowX: 'auto', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}><code>{CODE_EXAMPLES[example]}</code></pre>
+                        <button style={{ ...btnStyle(), position: 'absolute', top: 12, right: 12 }} onClick={() => copyText(CODE_EXAMPLES[example], 'code')}>
+                            {copiedId === 'code' ? 'Copied!' : 'Copy'}
+                        </button>
                     </div>
-
-                    <div style={{ marginBottom: 28 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>Authentication</div>
-                        <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', padding: '10px 16px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                            X-API-Key: sg_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                        </div>
-                    </div>
-
-                    {/* Code tabs */}
-                    <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 12 }}>Example: POST /simulate</div>
-                        <div style={{ display: 'flex', gap: 4, marginBottom: 0 }}>
-                            {['curl', 'node', 'python'].map(lang => (
-                                <button key={lang} onClick={() => setCodeTab(lang)} style={{
-                                    padding: '6px 16px', fontSize: '0.72rem', fontWeight: 700,
-                                    background: codeTab === lang ? 'var(--border)' : 'none',
-                                    border: '1px solid var(--border)', borderBottom: codeTab === lang ? '1px solid var(--bg-dark)' : '1px solid var(--border)',
-                                    cursor: 'pointer', color: codeTab === lang ? 'var(--fg)' : 'var(--dim)',
-                                    letterSpacing: '0.08em',
-                                }}>{lang.toUpperCase()}</button>
-                            ))}
-                        </div>
-                        <div style={{ position: 'relative' }}>
-                            <pre style={{ fontFamily: 'monospace', fontSize: '0.78rem', padding: '20px', background: 'var(--bg)', border: '1px solid var(--border)', overflowX: 'auto', lineHeight: 1.7, color: 'var(--fg)', margin: 0 }}>
-                                {CODE_EXAMPLES[codeTab]}
-                            </pre>
-                            <button
-                                onClick={() => { navigator.clipboard.writeText(CODE_EXAMPLES[codeTab]) }}
-                                className="btn btn-ghost btn-sm"
-                                style={{ position: 'absolute', top: 12, right: 12, fontSize: '0.65rem' }}
-                            >Copy</button>
-                        </div>
-                    </div>
-
-                    <div style={{ marginTop: 32 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 12 }}>Response Events</div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                                    {['Event type', 'Description'].map(h => (
-                                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--dim)', fontWeight: 600 }}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[
-                                    ['progress', 'Simulation step completed (8 steps total)'],
-                                    ['result', 'Final verdict: risk_score, verdict, threats[]'],
-                                    ['error', 'Simulation failed — check message field'],
-                                    ['done', 'Stream complete — close connection'],
-                                ].map(([type, desc]) => (
-                                    <tr key={type} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '10px 12px' }}><code style={{ color: 'var(--accent)' }}>{type}</code></td>
-                                        <td style={{ padding: '10px 12px', color: 'var(--dim)' }}>{desc}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div style={{ marginTop: 32, padding: '20px 24px', background: 'rgba(13,89,242,0.08)', border: '1px solid rgba(13,89,242,0.2)', fontSize: '0.82rem', color: 'var(--dim)', lineHeight: 1.6 }}>
-                        <strong style={{ color: 'var(--fg)' }}>Rate Limits:</strong> Requests over your monthly plan limit return HTTP 429. Usage resets on the 1st of each month. Contact <a href="mailto:enterprise@shadowguard.io" style={{ color: 'var(--accent)' }}>enterprise@shadowguard.io</a> for unlimited access.
+                    <div style={{ ...cardStyle, marginTop: 12, fontSize: '0.82rem', color: 'var(--dim)' }}>
+                        <b style={{ color: 'var(--text)' }}>Rate limit headers</b><br />
+                        Every response includes: <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, <code>X-Plan</code><br /><br />
+                        <b style={{ color: 'var(--text)' }}>Enterprise / custom limits?</b><br />
+                        Email <a href="mailto:api@shadowguard.io" style={{ color: 'var(--accent)' }}>api@shadowguard.io</a>
                     </div>
                 </div>
             )}

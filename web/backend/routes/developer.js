@@ -1,6 +1,6 @@
 /**
  * routes/developer.js
- * API key CRUD endpoints — requires Firebase auth.
+ * API key CRUD endpoints — requires JWT auth (no Firebase).
  * 
  * GET    /api/developer/keys         → list all user's keys
  * POST   /api/developer/keys         → create a new key
@@ -11,11 +11,11 @@
 
 const express = require('express');
 const router = express.Router();
-const firebaseAuth = require('../middleware/firebaseAuth');
+const { jwtAuth } = require('./auth');
 const { createApiKey, listApiKeys, deleteApiKey, getUsageStats, PLANS } = require('../lib/db');
 
-// All routes require Firebase auth
-router.use(firebaseAuth);
+// All routes require JWT auth
+router.use(jwtAuth);
 
 // GET /api/developer/keys
 router.get('/keys', (req, res) => {
