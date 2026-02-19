@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const NETWORKS = [
@@ -76,7 +76,7 @@ export default function Live() {
     const prevScrollHeight = useRef(0)
     const isAtTopRef = useRef(true)
 
-    useLayoutEffect(() => {
+    React.useLayoutEffect(() => {
         const container = containerRef.current
         if (!container) return
 
