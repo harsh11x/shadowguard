@@ -6,6 +6,7 @@ import Policy from './pages/Policy.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Inspector from './pages/Inspector.jsx'
 import Live from './pages/Live.jsx'
+import Developer from './pages/Developer.jsx'
 
 
 function NetworkBar() {
@@ -54,6 +55,7 @@ function Sidebar() {
         { to: '/history', icon: '▤', label: 'History' },
         { to: '/inspector', icon: '⬢', label: 'Inspector' },
         { to: '/policy', icon: '⚙', label: 'Policy' },
+        { to: '/developer', icon: '🔑', label: 'Developer API' },
     ]
     return (
         <aside className="sidebar">
@@ -119,6 +121,7 @@ function App() {
                             <Route path="/history" element={<History />} />
                             <Route path="/inspector" element={<Inspector />} />
                             <Route path="/policy" element={<Policy />} />
+                            <Route path="/developer" element={<Developer />} />
                         </Routes>
                     </main>
 

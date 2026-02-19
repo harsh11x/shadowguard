@@ -1,25 +1,42 @@
 /**
- * GET /api/network
- * Returns live Ethereum Sepolia network status via Python.
+ * GET /api/network?network=ethereum
+ * Real-time chain data via ethers.js — no Python subprocess needed.
  */
 
 const express = require('express');
 const router = express.Router();
-const { runPython } = require('../lib/python');
+const { getHttpProvider, getChainConfig } = require('../lib/chains');
+const { ethers } = require('ethers');
 
 router.get('/', async (req, res) => {
+    const network = req.query.network || 'ethereum';
+
     try {
-        const lines = await runPython(['network']);
-        // The network command emits a single JSON object
-        const result = lines.find(l => l.chain_id !== undefined || l.block !== undefined);
-        if (result) {
-            res.json(result);
-        } else {
-            res.status(503).json({ error: 'Could not fetch network data' });
-        }
+        const provider = getHttpProvider(network);
+        const cfg = getChainConfig(network);
+
+        const [blockNumber, feeData] = await Promise.all([
+            provider.getBlockNumber(),
+            provider.getFeeData().catch(() => ({})),
+        ]);
+
+        const gasPrice = feeData.gasPrice ? parseFloat(ethers.formatUnits(feeData.gasPrice, 'gwei')) : null;
+        const maxFee = feeData.maxFeePerGas ? parseFloat(ethers.formatUnits(feeData.maxFeePerGas, 'gwei')) : null;
+
+        res.json({
+            network,
+            chain_id: cfg.id,
+            name: cfg.name,
+            symbol: cfg.symbol,
+            block: blockNumber,
+            gas_price_gwei: gasPrice ? gasPrice.toFixed(2) : null,
+            max_fee_gwei: maxFee ? maxFee.toFixed(2) : null,
+            explorer: cfg.explorer,
+            timestamp: new Date().toISOString(),
+        });
     } catch (err) {
         console.error('[network] Error:', err.message);
-        res.status(503).json({ error: err.message });
+        res.status(503).json({ error: 'Could not connect to network: ' + err.message });
     }
 });
 

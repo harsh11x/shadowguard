@@ -1,55 +1,65 @@
 /**
- * GET /api/address/:addr  — on-chain info for any address
- * GET /api/address/:addr/simulations — history involving this address
+ * GET /api/address/:addr  — real on-chain info via ethers.js
+ * GET /api/address/:addr/simulations — simulation history for address
  */
 
 const express = require('express');
 const router = express.Router();
+const { ethers } = require('ethers');
+const { getHttpProvider } = require('../lib/chains');
 const { runPython } = require('../lib/python');
 
-// Known labels for Sepolia addresses
 const KNOWN_LABELS = {
+    '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2 Router',
+    '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3 Router',
+    '0xdef1c0ded9bec7f1a1670819833240f027b25eff': '0x Exchange Proxy',
+    '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': 'SushiSwap Router',
+    '0x00000000219ab540356cbb839cbe05303d7705fa': 'ETH2 Deposit Contract',
+    '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': 'WETH (Wrapped Ether)',
+    '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'USD Coin (USDC)',
+    '0xdac17f958d2ee523a2206206994597c13d831ec7': 'Tether (USDT)',
+    '0x6b175474e89094c44da98b954eedeac495271d0f': 'Dai Stablecoin',
     '0x7b79995e5f793a07bc00c21412e50ecae098e7f9': 'Sepolia WETH',
-    '0xc532a74256d3db42d0bf7a0400fefdbad7694008': 'Uniswap V2 Router (Sepolia)',
-    '0x6ae43d3271ff6888e7fc43fd7321a503ff738951': 'Aave Pool (Sepolia)',
-    '0x000000000022d473030f116ddee9f6b43ac78ba3': 'Permit2',
-    '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266': 'Hardhat Account #0',
     '0x0000000000000000000000000000000000000001': 'Precompile: ecRecover',
     '0x0000000000000000000000000000000000000002': 'Precompile: SHA-256',
+    '0x000000000022d473030f116ddee9f6b43ac78ba3': 'Permit2',
 };
 
 router.get('/:addr', async (req, res) => {
     const addr = req.params.addr.toLowerCase();
+    const network = req.query.network || 'ethereum';
+
+    if (!ethers.isAddress(addr)) {
+        return res.status(400).json({ error: 'Invalid Ethereum address' });
+    }
 
     try {
-        const lines = await runPython(['network']);
-        const netInfo = lines.find(l => l.block !== undefined) || {};
+        const provider = getHttpProvider(network);
+        const [balance, nonce, code, blockNumber] = await Promise.all([
+            provider.getBalance(addr),
+            provider.getTransactionCount(addr),
+            provider.getCode(addr),
+            provider.getBlockNumber(),
+        ]);
 
-        // Run a quick balance/code check via Python
-        const infoLines = await runPython(['address_info', '--address', addr]);
-        const info = infoLines.find(l => l.balance_wei !== undefined) || {};
+        const codeSize = code === '0x' ? 0 : (code.length - 2) / 2;
 
         res.json({
             address: addr,
+            network,
             label: KNOWN_LABELS[addr] || null,
-            balance_wei: info.balance_wei ?? null,
-            balance_eth: info.balance_eth ?? null,
-            nonce: info.nonce ?? null,
-            code_size: info.code_size ?? null,
-            is_contract: (info.code_size ?? 0) > 0,
-            block: netInfo.block ?? null,
+            balance_wei: balance.toString(),
+            balance_eth: parseFloat(ethers.formatEther(balance)).toFixed(6),
+            nonce,
+            code_size: codeSize,
+            is_contract: codeSize > 0,
+            block: blockNumber,
         });
     } catch (err) {
-        // Fallback: return what we know without RPC
-        res.json({
+        res.status(503).json({
             address: addr,
             label: KNOWN_LABELS[addr] || null,
-            balance_wei: null,
-            balance_eth: null,
-            nonce: null,
-            code_size: null,
-            is_contract: null,
-            error: err.message,
+            error: 'Could not fetch on-chain data: ' + err.message,
         });
     }
 });
