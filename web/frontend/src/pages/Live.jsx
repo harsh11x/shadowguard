@@ -108,11 +108,9 @@ export default function Live() {
                     setIsStreaming(true)
                     setStatus(data.message || 'Connected')
                 } else if (data.type === 'tx') {
-                    setIsStreaming(true) // Ensure status flips on data
+                    // Infinite Scroll: No slice
                     setTxs(prev => [data, ...prev])
                     setCount(c => c + 1)
-                } else if (data.type === 'ping') {
-                    // console.debug('ping received');
                 } else if (data.type === 'error') {
                     setStatus(`Error: ${data.message}`)
                     setIsStreaming(false)
@@ -190,12 +188,12 @@ export default function Live() {
                     className="table-container"
                     ref={containerRef}
                     onScroll={(e) => {
-                        // Tighten threshold: only stick if truly at the top
-                        isAtTopRef.current = e.target.scrollTop < 10
+                        // Check if user is near top (within 50px)
+                        isAtTopRef.current = e.target.scrollTop < 50
                     }}
                     style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}
                 >
-                    <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table className="data-table" style={{ width: '100%' }}>
                         <thead>
                             <tr style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--dim)' }}>
                                 <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: 600 }}>HASH</th>
@@ -207,8 +205,8 @@ export default function Live() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((tx) => (
-                                <TransactionRow key={tx.hash} tx={tx} onAnalyze={handleAnalyze} />
+                            {filtered.map((tx, idx) => (
+                                <TransactionRow key={tx.hash + idx} tx={tx} onAnalyze={handleAnalyze} />
                             ))}
                             {filtered.length === 0 && (
                                 <tr>

@@ -100,12 +100,4 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`  ╚═════╝  Public API: http://localhost:${PORT}/api/v1/simulate\n`);
 });
 
-// Guard against crashes in async tasks
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('[CRITICAL] Unhandled Rejection:', reason);
-});
-process.on('uncaughtException', (err) => {
-    console.error('[CRITICAL] Uncaught Exception:', err);
-});
-
 module.exports = app;

@@ -11,16 +11,16 @@ const CHAIN_CONFIGS = {
         id: 1,
         name: 'Ethereum Mainnet',
         symbol: 'ETH',
-        rpcHttp: process.env.ETH_RPC_URL || 'https://eth.llamarpc.com',
-        rpcWs: (process.env.ETH_WS_URL || 'wss://eth.drpc.org,wss://ethereum-rpc.publicnode.com,wss://eth.llamarpc.com').split(','),
+        rpcHttp: process.env.ETH_RPC_URL || 'https://cloudflare-eth.com',
+        rpcWs: process.env.ETH_WS_URL || 'wss://eth.llamarpc.com',
         explorer: 'https://etherscan.io',
     },
     sepolia: {
         id: 11155111,
         name: 'Ethereum Sepolia',
         symbol: 'ETH',
-        rpcHttp: process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
-        rpcWs: (process.env.SEPOLIA_WS_URL || 'wss://ethereum-sepolia-rpc.publicnode.com').split(','),
+        rpcHttp: process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+        rpcWs: process.env.SEPOLIA_WS_URL || 'wss://ethereum-sepolia-rpc.publicnode.com',
         explorer: 'https://sepolia.etherscan.io',
     },
     polygon: {
@@ -28,7 +28,7 @@ const CHAIN_CONFIGS = {
         name: 'Polygon',
         symbol: 'MATIC',
         rpcHttp: process.env.POLYGON_RPC_URL || 'https://polygon.llamarpc.com',
-        rpcWs: (process.env.POLYGON_WS_URL || 'wss://polygon.llamarpc.com,wss://polygon-bor-rpc.publicnode.com').split(','),
+        rpcWs: process.env.POLYGON_WS_URL || 'wss://polygon.llamarpc.com',
         explorer: 'https://polygonscan.com',
     },
     bsc: {
@@ -36,7 +36,7 @@ const CHAIN_CONFIGS = {
         name: 'BNB Smart Chain',
         symbol: 'BNB',
         rpcHttp: process.env.BSC_RPC_URL || 'https://binance.llamarpc.com',
-        rpcWs: (process.env.BSC_WS_URL || 'wss://binance.llamarpc.com,wss://bsc-rpc.publicnode.com').split(','),
+        rpcWs: process.env.BSC_WS_URL || 'wss://binance.llamarpc.com',
         explorer: 'https://bscscan.com',
     },
     arbitrum: {
@@ -44,7 +44,7 @@ const CHAIN_CONFIGS = {
         name: 'Arbitrum One',
         symbol: 'ETH',
         rpcHttp: process.env.ARB_RPC_URL || 'https://arbitrum.llamarpc.com',
-        rpcWs: (process.env.ARB_WS_URL || 'wss://arbitrum.llamarpc.com,wss://arbitrum-one-rpc.publicnode.com').split(','),
+        rpcWs: process.env.ARB_WS_URL || 'wss://arbitrum.llamarpc.com',
         explorer: 'https://arbiscan.io',
     },
 };
@@ -60,51 +60,10 @@ function getHttpProvider(network = 'ethereum') {
     return _httpProviders[network];
 }
 
-const _wsRotator = {};
-
-// WebSocket providers with heartbeats and auto-reconnect logic
+// WebSocket providers are created fresh each time (stateful streams)
 function getWsProvider(network = 'ethereum') {
     const cfg = CHAIN_CONFIGS[network] || CHAIN_CONFIGS.ethereum;
-
-    // Pick an endpoint (round-robin)
-    if (_wsRotator[network] === undefined) _wsRotator[network] = 0;
-    const urls = Array.isArray(cfg.rpcWs) ? cfg.rpcWs : [cfg.rpcWs];
-    const url = urls[_wsRotator[network] % urls.length];
-    _wsRotator[network]++;
-
-    console.log(`[ws] Connecting to ${network} via ${url}...`);
-
-    // Use a custom provider that handles heartbeats
-    const provider = new ethers.WebSocketProvider(url);
-
-    // Monitor the underlying websocket
-    const socket = provider.websocket;
-    if (socket) {
-        socket.onopen = () => {
-            console.log(`[ws] ${network} connection opened`);
-        };
-        socket.onclose = (event) => {
-            console.warn(`[ws] ${network} connection closed (code: ${event.code}, reason: ${event.reason})`);
-        };
-        socket.onerror = (err) => {
-            console.error(`[ws] ${network} connection error:`, err.message);
-        };
-
-        // Keep-alive heartbeat (using provider's own logic to avoid ID collisions)
-        const pingInterval = setInterval(async () => {
-            try {
-                if (socket.readyState === 1) {
-                    await provider.getBlockNumber();
-                }
-            } catch (e) {
-                // Silently handle heartbeat errors to prevent feed crashes
-            }
-        }, 15000);
-
-        provider._interval = pingInterval;
-    }
-
-    return provider;
+    return new ethers.WebSocketProvider(cfg.rpcWs);
 }
 
 function getChainConfig(network = 'ethereum') {

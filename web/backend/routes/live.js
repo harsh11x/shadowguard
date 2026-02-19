@@ -73,7 +73,6 @@ router.get('/stream', async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
@@ -81,25 +80,17 @@ router.get('/stream', async (req, res) => {
         try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch (_) { }
     };
 
-    // Initialize all to null to prevent ReferenceErrors
-    let provider = null;
-    let keepAlive = null;
-    let watchdog = null;
-    let poller = null;
+    console.log(`[live] Starting WebSocket stream for ${network}...`);
+
+    let provider;
     let txCount = 0;
-    let lastDataAt = Date.now();
-
-    console.log(`[live] ENGINE_START_V3 for ${network}...`);
-
+    let keepAlive;
     try {
         provider = getWsProvider(network);
 
         send({ type: 'connected', network, chain_id: cfg.id, message: `Connected to ${cfg.name} mempool` });
 
         provider.on('pending', async (txHash) => {
-            lastDataAt = Date.now();
-            if (txCount % 100 === 0) console.log(`[live] Received hash: ${txHash} (${txCount} sent so far)`);
-
             try {
                 const tx = await provider.getTransaction(txHash);
                 if (!tx) return;
@@ -113,7 +104,9 @@ router.get('/stream', async (req, res) => {
                     hash: tx.hash,
                     from: tx.from,
                     to: tx.to,
+                    value: tx.value?.toString() || '0',
                     value_eth: parseFloat(ethers.formatEther(tx.value || 0n)).toFixed(6),
+                    gas_limit: tx.gasLimit?.toString(),
                     data: tx.data?.slice(0, 66) || '0x',
                     has_data: (tx.data?.length || 0) > 2,
                     known_contract: KNOWN_CONTRACTS[tx.to?.toLowerCase()] || null,
@@ -123,84 +116,22 @@ router.get('/stream', async (req, res) => {
                     network,
                     timestamp: new Date().toISOString(),
                 });
-            } catch (pErr) {
-                console.error(`[live] Error processing tx ${txHash}:`, pErr.message);
+            } catch (_) {
+                // Transaction not found or network error — skip silently
             }
         });
 
         provider.on('error', (err) => {
             console.error(`[live-ws] ${network} error:`, err.message);
-            // Don't send error to frontend immediately to allow auto-reconnect attempt
+            send({ type: 'error', message: 'WebSocket error: ' + err.message });
         });
 
-        // Block Processing Function
-        const processBlock = async (blockNumber) => {
-            if (!blockNumber) return;
-            console.log(`[live] Processing block ${blockNumber} on ${network}...`);
-            lastDataAt = Date.now();
-            try {
-                const block = await provider.getBlock(blockNumber, true);
-                if (!block || !block.transactions) return;
-
-                const txs = block.transactions;
-                console.log(`[live] ${network} block ${blockNumber}: streaming ${txs.length} txs`);
-
-                for (const tx of txs.slice(0, 15)) {
-                    const { score, reasons } = computeRiskScore(tx);
-                    const risk = classifyRisk(score);
-                    send({
-                        type: 'tx',
-                        hash: tx.hash,
-                        from: tx.from,
-                        to: tx.to,
-                        value_eth: parseFloat(ethers.formatEther(tx.value || 0n)).toFixed(6),
-                        risk_score: score,
-                        risk_level: risk,
-                        risk_reasons: reasons,
-                        network,
-                        is_finalized: true,
-                    });
-                }
-            } catch (e) {
-                console.error(`[live] Block sync error: ${e.message}`);
-            }
-        };
-
-        provider.on('block', processBlock);
-
-        // Polling Fallback: Check for new block every 15s in case WS is silent
-        let lastPolledBlock = 0;
-        poller = setInterval(async () => {
-            try {
-                if (!provider) return;
-                const currentBlock = await provider.getBlockNumber();
-                if (currentBlock > lastPolledBlock) {
-                    if (lastPolledBlock > 0) await processBlock(currentBlock);
-                    lastPolledBlock = currentBlock;
-                }
-            } catch (_) { }
-        }, 15000);
-
-        // Watchdog: If no data (no pending AND no blocks) for some time, signal an error to trigger frontend retry
-        watchdog = setInterval(() => {
-            const idleTime = Date.now() - lastDataAt;
-            const isQuietNetwork = ['sepolia'].includes(network);
-            // More generous for blocks (since blocks are ~12-15s)
-            const timeout = isQuietNetwork ? 600000 : 90000;
-
-            if (idleTime > timeout) {
-                console.warn(`[live] ${network} stream stalled (no data for ${timeout / 1000}s). Triggering retry.`);
-                res.end(); // Closing the response triggers EventSource auto-retry
-            }
-        }, 30000);
-
-        // Keep-alive ping every 15s to prevent SSE timeout
+        // Keep-alive ping every 30s to prevent SSE timeout
         keepAlive = setInterval(() => {
             send({ type: 'ping', timestamp: new Date().toISOString() });
-        }, 15000);
+        }, 30000);
 
     } catch (err) {
-        console.error(`[live] Critical setup error: ${err.message}`);
         send({ type: 'error', message: `Failed to connect to ${network}: ${err.message}` });
         res.end();
         return;
@@ -208,18 +139,11 @@ router.get('/stream', async (req, res) => {
 
     req.on('close', () => {
         console.log(`[live] Client disconnected from ${network} stream (${txCount} tx sent)`);
-
-        // Final protection against ReferenceErrors or duplicate closures
-        try { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } } catch (_) { }
-        try { if (watchdog) { clearInterval(watchdog); watchdog = null; } } catch (_) { }
-        try { if (poller) { clearInterval(poller); poller = null; } } catch (_) { }
-
+        if (keepAlive) clearInterval(keepAlive);
         try {
             if (provider) {
                 provider.removeAllListeners();
-                // Ensure provider is actually destroyed
-                provider.destroy().catch(() => { });
-                provider = null;
+                provider.destroy();
             }
         } catch (_) { }
     });
