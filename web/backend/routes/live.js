@@ -84,16 +84,12 @@ router.get('/stream', async (req, res) => {
 
     let provider;
     let txCount = 0;
-    const MAX_PER_SESSION = 200;
-
     try {
         provider = getWsProvider(network);
 
         send({ type: 'connected', network, chain_id: cfg.id, message: `Connected to ${cfg.name} mempool` });
 
         provider.on('pending', async (txHash) => {
-            if (txCount >= MAX_PER_SESSION) return;
-
             try {
                 const tx = await provider.getTransaction(txHash);
                 if (!tx) return;

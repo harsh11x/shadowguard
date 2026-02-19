@@ -93,7 +93,7 @@ function AuthForm({ onUser }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 24 }}>
             <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: '2rem', width: '100%', maxWidth: 440 }}>
-                <h2 style={{ marginBottom: 4, fontSize: '1.4rem', fontWeight: 800 }}>
+                <h2 style={{ marginBottom: 4, fontSize: '1.4rem', fontWeight: 800, color: 'var(--yellow)' }}>
                     {mode === 'login' ? 'Sign In' : 'Create Account'}
                 </h2>
                 <p style={{ color: 'var(--dim)', fontSize: '0.82rem', marginBottom: '1.5rem' }}>
@@ -161,6 +161,8 @@ export default function Developer() {
     const [example, setExample] = useState('curl')
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
+    const [usage, setUsage] = useState([]) // Daily usage stats
+    const [currentPlan, setCurrentPlan] = useState('demo')
 
     useEffect(() => {
         const stored = getToken()
@@ -182,9 +184,19 @@ export default function Developer() {
 
     const fetchKeys = async () => {
         try {
-            const r = await fetch('/api/developer/keys', { headers: authHeader() })
+            const r = await fetch('/api/developer/usage', { headers: authHeader() })
             const d = await r.json()
-            if (r.ok) setKeys(d.keys || [])
+            if (r.ok) {
+                setKeys(d.keys || [])
+                setUsage(d.dailyUsage || [])
+                // Determine current plan from active keys (highest tier)
+                const planOrder = { demo: 0, starter: 1, professional: 2, enterprise: 3 }
+                const activePlans = d.keys?.filter(k => k.active).map(k => k.plan) || []
+                if (activePlans.length) {
+                    const maxPlan = activePlans.sort((a, b) => planOrder[b] - planOrder[a])[0]
+                    setCurrentPlan(maxPlan)
+                }
+            }
         } catch (e) { setError(e.message) }
     }
 
@@ -248,6 +260,21 @@ export default function Developer() {
             {error && <div style={{ background: '#ff000015', border: '1px solid #ff000060', color: '#ff6b6b', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>{error} <span style={{ cursor: 'pointer', float: 'right' }} onClick={() => setError('')}>✕</span></div>}
             {success && <div style={{ background: '#10b98115', border: '1px solid #10b98160', color: '#10b981', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>{success} <span style={{ cursor: 'pointer', float: 'right' }} onClick={() => setSuccess('')}>✕</span></div>}
 
+            {/* ── Overview / Usage Chart ─────────────────────────────────────── */}
+            {tab === 'keys' && usage.length > 0 && (
+                <div style={{ ...cardStyle, marginBottom: '2rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Last 7 Days Usage</h3>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', height: 120, gap: 8, paddingBottom: 20 }}>
+                        {usage.map((u, i) => (
+                            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                <div style={{ width: '100%', background: 'var(--accent)', opacity: 0.2 + (u.count / 50), height: Math.max(4, (u.count / 50) * 100) + '%', borderRadius: 2, minHeight: 4, transition: 'height 0.3s' }}></div>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--dim)' }}>{u.date}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* ── Keys Tab ───────────────────────────────────────────────────── */}
             {tab === 'keys' && (
                 <div>
@@ -290,7 +317,16 @@ export default function Developer() {
                             <div>
                                 <span style={{ fontWeight: 700, marginRight: 8 }}>{k.name}</span>
                                 <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: 'var(--accent)', color: '#000', fontWeight: 700, marginRight: 8 }}>{k.plan?.toUpperCase()}</span>
-                                <code style={{ fontSize: '0.75rem', color: 'var(--dim)' }}>{k.key_prefix}••••</code>
+                                <code style={{ fontSize: '0.75rem', color: 'var(--dim)', marginRight: 8 }}>{k.key_prefix}••••</code>
+                                {k.key_raw && (
+                                    <button
+                                        style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--dim)', cursor: 'pointer', padding: '2px 6px', fontSize: '0.7rem' }}
+                                        onClick={() => copyText(k.key_raw, k.id)}
+                                        title="Copy full API Key"
+                                    >
+                                        {copiedId === k.id ? 'Copied!' : '📋'}
+                                    </button>
+                                )}
                             </div>
                             <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.78rem', color: 'var(--dim)' }}>
                                 <span>{k.request_count || 0} requests</span>
@@ -311,7 +347,18 @@ export default function Developer() {
                             <div style={{ color: p.color, fontWeight: 800, marginBottom: 8 }}>{p.name}</div>
                             <div style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 4 }}>{p.price}<span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--dim)' }}>{p.period}</span></div>
                             <div style={{ fontSize: '0.8rem', color: 'var(--dim)', marginBottom: '1rem' }}>{p.requests}</div>
-                            <button style={{ ...btnStyle(p.highlight ? p.color : 'transparent', p.highlight ? '#000' : 'var(--dim)'), width: '100%', border: `1px solid ${p.color}` }}>{p.cta}</button>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--dim)', marginBottom: '1rem' }}>{p.requests}</div>
+                            <button
+                                disabled={p.id === currentPlan}
+                                style={{
+                                    ...btnStyle(p.id === currentPlan ? 'var(--bg)' : (p.highlight ? p.color : 'transparent'), p.id === currentPlan ? 'var(--dim)' : (p.highlight ? '#000' : 'var(--dim)')),
+                                    width: '100%',
+                                    border: `1px solid ${p.id === currentPlan ? 'var(--border)' : p.color}`,
+                                    cursor: p.id === currentPlan ? 'default' : 'pointer'
+                                }}
+                            >
+                                {p.id === currentPlan ? 'Current Plan' : p.cta}
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -326,8 +373,10 @@ export default function Developer() {
                         ))}
                     </div>
                     <div style={{ position: 'relative', ...cardStyle }}>
-                        <pre style={{ margin: 0, fontSize: '0.78rem', overflowX: 'auto', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}><code>{CODE_EXAMPLES[example]}</code></pre>
-                        <button style={{ ...btnStyle(), position: 'absolute', top: 12, right: 12 }} onClick={() => copyText(CODE_EXAMPLES[example], 'code')}>
+                        <pre style={{ margin: 0, fontSize: '0.78rem', overflowX: 'auto', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}><code>
+                            {CODE_EXAMPLES[example].replace('YOUR_API_KEY', (keys.find(k => k.active)?.key_raw || keys[0]?.key_raw || 'YOUR_API_KEY'))}
+                        </code></pre>
+                        <button style={{ ...btnStyle(), position: 'absolute', top: 12, right: 12 }} onClick={() => copyText(CODE_EXAMPLES[example].replace('YOUR_API_KEY', (keys.find(k => k.active)?.key_raw || keys[0]?.key_raw || 'YOUR_API_KEY')), 'code')}>
                             {copiedId === 'code' ? 'Copied!' : 'Copy'}
                         </button>
                     </div>

@@ -1,211 +1,123 @@
-# SHADOWGUARD
+# 🛡️ SHADOWGUARD: Pre-Execution Security Proxy
 
-**Deterministic Pre-Execution Blockchain Security Proxy**
+### "The Firewall for your Blockchain Transactions"
 
-SHADOWGUARD simulates Ethereum transactions *before* they hit the chain — scanning bytecode, computing state diffs, and scoring risk in real-time. No gas spent. No transactions broadcast.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Blockchain** | Ethereum Sepolia Testnet (Chain ID: 11155111) |
-| **Simulation Engine** | Python 3 — `web3.py`, `eth_call`, `eth_estimateGas` |
-| **API Bridge** | Node.js + Express.js — spawns Python subprocess, streams JSON via SSE |
-| **Frontend** | React 18 + Vite — brutalist UI, real-time SSE step streaming |
-| **Database** | SQLite (via Python) — stores all simulation records |
-| **Dev Runner** | `concurrently` — single `npm run dev` starts everything |
+**ShadowGuard** is a Pre-Execution Security Proxy that checks blockchain transactions **before** they are finalized. It acts as a safety layer (a "firewall") between your wallet and the decentralized web, preventing loss before it can happen.
 
 ---
 
-## Architecture
+## 🧐 What does ShadowGuard do? (Simple Words)
 
-```
-npm run dev
-├── backend/  (Express.js, port 3001)
-│   ├── POST /api/simulate  →  SSE stream of 8 simulation steps
-│   ├── GET  /api/history   →  past simulations from SQLite
-│   ├── GET/POST /api/policy →  read/write security policy
-│   └── GET  /api/network   →  live Sepolia chain data
-│       └── lib/python.js   →  spawns python3 main.py --json ...
-└── frontend/ (React + Vite, port 5173)
-    ├── /           Simulate page — form + live step stream
-    ├── /history    History page — past simulation table
-    └── /policy     Policy page — risk threshold editor
-```
+In the crypto world, once you sign a transaction, it's usually gone forever. If you accidentally interact with a malicious contract or a wallet drainer, your funds can disappear in seconds.
 
-**Python Bridge**: Node.js spawns `python3 main.py --json simulate --from ... --to ...` and reads newline-delimited JSON from stdout. Each simulation step emits one JSON line, streamed to the browser via Server-Sent Events.
+**ShadowGuard changes this:**
+It intercepts your transaction, simulates it in a **safe shadow environment**, and analyzes exactly what will happen to your assets. It assigns a risk score and then decides whether to **Allow** or **Block** it. 
+
+By running transactions through this "pre-check," ShadowGuard helps reduce:
+*   ❌ **Fraud & Scams**: Detecting hidden "drain" commands.
+*   ❌ **Smart Contract Exploits**: Spotting known attack patterns.
+*   ❌ **Accidental Losses**: Warning you if you're about to send funds to the wrong place.
 
 ---
 
-## Simulation Pipeline (8 Steps)
-
-| Step | What Happens | Data Source |
-|---|---|---|
-| 1 | Transaction Interception & Validation | Input validation, gas estimation via `eth_estimateGas` |
-| 2 | Pre-Execution State Snapshot | Live `eth_getBalance`, `eth_getCode`, `eth_getStorageAt` |
-| 3 | Shadow Execution | `eth_call` — simulates execution, no gas spent |
-| 4 | State Diff Computation | Real gas price × gas used = actual cost |
-| 5 | Opcode Analysis | Bytecode scan for SELFDESTRUCT, DELEGATECALL, CREATE2, SSTORE |
-| 6 | Behavioral Analysis | Real opcode counts + `eth_getLogs` event activity |
-| 7 | Risk Score Computation | Weighted rule engine (0–100) |
-| 8 | Security Policy Application | User-configurable thresholds from `policy.json` |
+## 📽️ Project Presentation
+A detailed PowerPoint presentation (`.pptx`) explaining the architecture and vision of this project can be found in the **`Presentation/`** folder.
 
 ---
 
-## 🐳 Docker Deployment
+## 🚀 Key Features
 
-The entire project is containerized using Docker and Docker Compose. This includes the Python simulation engine, the Express backend, and the React frontend.
+### 1. 🔍 Predictive Simulation (AssetFlow & CodeDNA)
+Don't just look at hex data. ShadowGuard visualizes the transaction flow. You can see exactly which tokens are moving, who is receiving them, and if the contract code looks suspicious.
 
-### Prerequisites
-- Docker
-- Docker Compose
+### 2. 🌊 Live Mempool Stream (With "Smart Scroll")
+Watch the entire Ethereum network in real-time. 
+*   **Infinite Feed**: See every transaction as it happens.
+*   **Sticky Scroll**: Scroll down to pause the feed and inspect rows. Scroll to the top to resume auto-updates.
 
-### Fast Start
-1. **Clone the repository** (if not already done).
-2. **Run the production stack**:
-   ```bash
-   docker-compose up --build
-   ```
-3. **Access the application**:
-   - Frontend: `http://localhost`
-   - API Backend: `http://localhost:3001`
+### 3. 🛡️ Admin Approval System
+Every new developer account requires manual verification. This ensures only trusted entities are using the security proxy at scale.
 
-### Service Breakdown
-- **Backend (Node + Python)**: Runs on port `3001`. It contains the Express API and the Python simulation core.
-- **Frontend (Nginx + React)**: Runs on port `80`. It serves the production build of the React app and proxies `/api` calls to the backend.
-- **Data Persistence**: A local `./data` directory is mapped to the containers to persist the SQLite database and policies.
-
-### Environment Variables
-You can customize the deployment using environment variables in a `.env` file at the root:
-- `ETH_RPC_URL`: Primary Ethereum RPC endpoint.
-- `API_PORT`: Port for the backend API.
+### 4. 🔑 Developer API Portal
+Generate API keys, track your usage, and integrate ShadowGuard's security into your own apps.
 
 ---
 
-## Quick Start
+## ⚡️ Quick Start Guide
 
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- `pip install -r requirements.txt`
+### 1. Requirements
+*   **Docker Desktop** (Make sure it is running).
 
-### Run
-
+### 2. Build & Launch
+Open your terminal in the project folder and run:
 ```bash
-# 1. Install Python deps
-pip install -r requirements.txt
-
-# 2. Install Node deps
-cd web && npm install
-cd backend && npm install
-cd ../frontend && npm install
-cd ../..
-
-# 3. Start everything
-cd web && npm run dev
+docker-compose up --build
 ```
-
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001/api/health
-
-### CLI (still works)
-
-```bash
-# Standard rich terminal output
-python3 main.py simulate --from 0x000...001 --to 0x7b79...E7f9 --value 0 --data 0x
-
-# JSON output (used by Node.js bridge)
-python3 main.py --json simulate --from 0x000...001 --to 0x7b79...E7f9 --value 0 --data 0x
-
-# High-drain test (triggers HIGH risk + policy violation)
-python3 main.py simulate --from 0x000...001 --to 0x7b79...E7f9 --value 1.5 --data 0x
-
-# Set policy
-python3 main.py set_policy --max_drain 20 --disallow_selfdestruct true
-```
+*Wait until you see `Server running on port 3001`.*
 
 ---
 
-## Security Policy
+## 🏃‍♂️ Step-by-Step Walkthrough
 
-Configurable via the web UI (`/policy`) or CLI:
+Follow these steps to experience the full power of ShadowGuard:
 
-| Policy | Default | Effect |
-|---|---|---|
-| `max_drain` | 50% | Block if sender balance drain exceeds this |
-| `disallow_selfdestruct` | false | Block contracts with SELFDESTRUCT opcode |
-| `disallow_delegatecall` | false | Block contracts with DELEGATECALL opcode |
-| `max_nested_calls` | 5 | Flag deep call chains (reentrancy risk) |
+### Step 1: Monitor the Network
+Visit [http://localhost:8000/live](http://localhost:8000/live). You will see real-time transactions from the Ethereum network flowing in. Scroll down to "pause" the list and inspect a specific transaction.
 
----
+### Step 2: Create a Developer Account
+1.  Go to the **Sign Up** section on the main page.
+2.  Register with a new email.
+3.  **Note**: Your account will be "Pending" and you won't be able to log in yet.
 
-## Risk Scoring
+### Step 3: Admin Approval
+1.  Open [http://localhost:8000/admin/login](http://localhost:8000/admin/login).
+2.  Login with: `admin@shadowguard.com` / `admin123`.
+3.  Go to the **Verification Queue** tab.
+4.  Find your new account and click **Approve**.
 
-| Score | Level | Meaning |
-|---|---|---|
-| 0–25 | ✅ LOW | Safe to proceed |
-| 26–50 | 🟡 MEDIUM | Review triggered rules |
-| 51–75 | 🔶 HIGH | Manual audit recommended |
-| 76–100 | 🔴 CRITICAL | Block immediately |
+### Step 4: Generate API Keys
+1.  Now go to [http://localhost:8000/developer](http://localhost:8000/developer) and log in with the account you just created.
+2.  Click **"Generate New API Key"**.
+3.  Copy your key—you can now use this to call the ShadowGuard API!
 
----
-
-## Project Structure
-
-```
-shadowguard/
-├── main.py              # CLI entry point + --json bridge mode
-├── config.py            # Network config, risk weights
-├── requirements.txt     # Python deps
-├── policy.json          # Active security policy
-├── shadowguard.db       # SQLite simulation history
-├── core/
-│   ├── interceptor.py   # Transaction validation
-│   ├── shadow_executor.py  # eth_call simulation
-│   ├── state_snapshot.py   # On-chain state reader
-│   ├── state_diff.py    # Pre/post state comparison
-│   ├── opcode_analyzer.py  # Bytecode scanner
-│   ├── behavior_analyzer.py # Gas + call pattern analysis
-│   ├── risk_engine.py   # Weighted risk scoring
-│   └── policy_engine.py # Policy enforcement
-├── rpc/
-│   └── provider.py      # Web3 RPC with fallbacks
-├── models/
-│   └── simulation.py    # Data models
-├── storage/
-│   ├── database.py      # SQLite persistence
-│   └── logger.py        # Logging setup
-├── utils/
-│   └── helpers.py       # Shared utilities
-└── web/
-    ├── package.json     # Root: concurrently runner
-    ├── backend/
-    │   ├── server.js    # Express API server
-    │   ├── lib/python.js  # Python subprocess bridge
-    │   └── routes/
-    │       ├── simulate.js  # SSE simulation stream
-    │       ├── history.js   # Simulation log
-    │       ├── policy.js    # Policy CRUD
-    │       └── network.js   # Live chain status
-    └── frontend/
-        ├── src/
-        │   ├── App.jsx      # Router + layout
-        │   ├── index.css    # Brutalist design system
-        │   └── pages/
-        │       ├── Simulate.jsx  # Main simulation UI
-        │       ├── History.jsx   # Past simulations
-        │       └── Policy.jsx    # Policy editor
-        └── vite.config.js
-```
+### Step 5: Run a Simulation
+1.  Go to the **Simulate** page.
+2.  Enter a transaction (or use the pre-filled demo data).
+3.  Click **Simulate** and watch the **Visual Attack Graph** reveal the transaction's true intent.
 
 ---
 
-## Design Philosophy
+## 🔑 Portals & Access
 
-**Brutalist UI**: Raw monospace fonts (JetBrains Mono), hard 2px borders, no rounded corners, black/white/yellow high-contrast palette. The interface reflects the nature of the tool — direct, uncompromising, technical.
+| Portal | URL | Usage |
+| :--- | :--- | :--- |
+| **Main Dashboard** | [http://localhost:8000](http://localhost:8000) | Main interface for simulations and live feed. |
+| **Developer Portal** | [http://localhost:8000/developer](http://localhost:8000/developer) | Manage your API keys and see your usage stats. |
+| **Admin Panel** | [http://localhost:8000/admin/login](http://localhost:8000/admin/login) | Approve users and manage the system. |
 
-**Real data only**: Every value shown is fetched live from the Ethereum Sepolia network. No mocked data, no hardcoded results. Simulation IDs are unique per run (timestamp + random entropy). Risk scores change with inputs and policy.
+### 🔐 Login Credentials (Pre-Seeded)
 
-**Python bridge pattern**: Rather than rewriting the simulation engine in JavaScript, Node.js spawns Python as a subprocess and reads newline-delimited JSON. This keeps the battle-tested Python engine intact while enabling a modern web frontend.
+| Account Type | Email | Password |
+| :--- | :--- | :--- |
+| **System Admin** | `admin@shadowguard.com` | `admin123` |
+| **Demo Developer** | `harshdevsingh2004@gmail.com` | `12345678` |
+
+---
+
+## 🏗️ How it Works
+
+1.  **Intercept**: The proxy catches a transaction request.
+2.  **Shadow Simulation**: Using a local fork of the blockchain (via Anvil/Foundry), it executes the transaction in a private "sandbox."
+3.  **Analysis**: It checks for balance changes, contract permissions, and known threat signatures.
+4.  **Verdict**: It returns a risk score (0-100). If the risk is too high, the transaction is blocked.
+
+---
+
+## 🧼 Cleanup & Maintenance
+
+*   **To stop the system**: Press `Ctrl+C` in your terminal.
+*   **To wipe data & reset**: `docker-compose down -v`.
+*   **To update specific parts**: `docker-compose up -d --build frontend` (or `backend`).
+
+---
+*Created for the next generation of Web3 Security.*

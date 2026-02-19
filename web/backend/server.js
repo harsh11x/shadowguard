@@ -53,6 +53,9 @@ app.use('/api/auth', authRouter);
 // ── Developer Portal / Key Management ────────────────────────────────────────
 app.use('/api/developer', developerRouter);
 
+// ── Admin Panel ──────────────────────────────────────────────────────────────
+app.use('/api/admin', require('./routes/admin'));
+
 // ── Public External API (requires API key) ───────────────────────────────────
 app.use('/api/v1', v1Router);
 

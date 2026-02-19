@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard.jsx'
 import Inspector from './pages/Inspector.jsx'
 import Live from './pages/Live.jsx'
 import Developer from './pages/Developer.jsx'
+import Admin from './pages/Admin.jsx'
+import AdminLogin from './pages/AdminLogin.jsx'
 
 
 function NetworkBar() {
@@ -56,7 +58,21 @@ function Sidebar() {
         { to: '/inspector', icon: '⬢', label: 'Inspector' },
         { to: '/policy', icon: '⚙', label: 'Policy' },
         { to: '/developer', icon: '🔑', label: 'Developer API' },
+        { to: '/admin', icon: '🛡️', label: 'Admin Panel' },
     ]
+
+    // Check if user is admin (simple client-side check, protected by backend)
+    const token = localStorage.getItem('sg_dev_token');
+    let isAdmin = false;
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            // We need to fetch the user role from endpoint or rely on payload if we added it there.
+            // For now, let's just fetch it or assume if they can access /admin it works.
+            // Better: Add "Admin" link always, let the page handle 403.
+        } catch (e) { }
+    }
+
     return (
         <aside className="sidebar">
             <div className="sidebar-section">
@@ -72,6 +88,7 @@ function Sidebar() {
                         {n.label}
                     </NavLink>
                 ))}
+
             </div>
 
             <div className="sidebar-section">
@@ -97,36 +114,41 @@ function Sidebar() {
     )
 }
 
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+
 function App() {
     return (
         <BrowserRouter>
-            <div className="app">
-                <header className="header">
-                    <NavLink to="/" className="header-logo">
-                        <div className="header-logo-mark">SG</div>
-                        <div>
-                            <div className="header-logo-text">SHADOWGUARD</div>
-                            <div className="header-logo-sub">Pre-Execution Security Proxy · Ethereum Sepolia</div>
-                        </div>
-                    </NavLink>
-                    <NetworkBar />
-                </header>
-                <div className="main-content">
-                    <Sidebar />
-                    <main>
-                        <Routes>
-                            <Route path="/" element={<Simulate />} />
-                            <Route path="/live" element={<Live />} />
-                            <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/history" element={<History />} />
-                            <Route path="/inspector" element={<Inspector />} />
-                            <Route path="/policy" element={<Policy />} />
-                            <Route path="/developer" element={<Developer />} />
-                        </Routes>
-                    </main>
-
+            <ErrorBoundary>
+                <div className="app">
+                    <header className="header">
+                        <NavLink to="/" className="header-logo">
+                            <div className="header-logo-mark">SG</div>
+                            <div>
+                                <div className="header-logo-text">SHADOWGUARD</div>
+                                <div className="header-logo-sub">Pre-Execution Security Proxy · Ethereum Sepolia</div>
+                            </div>
+                        </NavLink>
+                        <NetworkBar />
+                    </header>
+                    <div className="main-content">
+                        <Sidebar />
+                        <main>
+                            <Routes>
+                                <Route path="/" element={<Simulate />} />
+                                <Route path="/live" element={<Live />} />
+                                <Route path="/dashboard" element={<Dashboard />} />
+                                <Route path="/history" element={<History />} />
+                                <Route path="/inspector" element={<Inspector />} />
+                                <Route path="/policy" element={<Policy />} />
+                                <Route path="/developer" element={<Developer />} />
+                                <Route path="/admin" element={<Admin />} />
+                                <Route path="/admin/login" element={<AdminLogin />} />
+                            </Routes>
+                        </main>
+                    </div>
                 </div>
-            </div>
+            </ErrorBoundary>
         </BrowserRouter>
     )
 }

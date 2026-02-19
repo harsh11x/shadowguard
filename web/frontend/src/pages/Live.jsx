@@ -71,11 +71,32 @@ export default function Live() {
     const navigate = useNavigate()
     const esRef = useRef(null)
 
+    // Scroll Anchoring Refs
+    const containerRef = useRef(null)
+    const prevScrollHeight = useRef(0)
+    const isAtTopRef = useRef(true)
+
+    useLayoutEffect(() => {
+        const container = containerRef.current
+        if (!container) return
+
+        const currentScrollHeight = container.scrollHeight
+        const heightDiff = currentScrollHeight - prevScrollHeight.current
+
+        // If content was added (diff > 0) and user was NOT at top, adjust scroll to maintain position
+        if (heightDiff > 0 && !isAtTopRef.current) {
+            container.scrollTop += heightDiff
+        }
+
+        prevScrollHeight.current = currentScrollHeight
+    }, [txs]) // Run after every txs update
+
     const connect = (net) => {
         if (esRef.current) { esRef.current.close(); esRef.current = null }
         setTxs([])
         setIsStreaming(false)
         setStatus(`Connecting to ${net}…`)
+        setCount(0)
 
         const es = new EventSource(`/api/live/stream?network=${net}`)
         esRef.current = es
@@ -87,7 +108,8 @@ export default function Live() {
                     setIsStreaming(true)
                     setStatus(data.message || 'Connected')
                 } else if (data.type === 'tx') {
-                    setTxs(prev => [data, ...prev].slice(0, 60))
+                    // Infinite Scroll: No slice
+                    setTxs(prev => [data, ...prev])
                     setCount(c => c + 1)
                 } else if (data.type === 'error') {
                     setStatus(`Error: ${data.message}`)
@@ -162,7 +184,15 @@ export default function Live() {
                     </div>
                 )}
 
-                <div className="table-container" style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
+                <div
+                    className="table-container"
+                    ref={containerRef}
+                    onScroll={(e) => {
+                        // Check if user is near top (within 50px)
+                        isAtTopRef.current = e.target.scrollTop < 50
+                    }}
+                    style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}
+                >
                     <table className="data-table" style={{ width: '100%' }}>
                         <thead>
                             <tr style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--dim)' }}>

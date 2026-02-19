@@ -122,54 +122,110 @@ function StepRow({ step, status, data }) {
     )
 }
 
+const DNA_COLORS = {
+    selfdestruct: '#ef4444',
+    delegatecall: '#f97316',
+    callcode: '#f59e0b',
+    create2: '#8b5cf6',
+    sstore: '#3b82f6',
+    other: '#374151'
+}
+
+function CodeDNA({ profile }) {
+    if (!profile || profile.bytecode_size === 0) return null
+    const total = profile.bytecode_size
+    // Normalize counts for visualization (just proportional representation)
+    const dangerous = (profile.selfdestruct_count + profile.delegatecall_count + profile.callcode_count) * 20
+    const writes = profile.sstore_count * 5
+    const creates = profile.create2_count * 10
+    const safe = Math.max(0, total - dangerous - writes - creates)
+
+    return (
+        <div style={{ marginTop: 16 }}>
+            <div className="risk-label" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span>Contract DNA / Opcode Profile</span>
+                <span className="mono dim">{total} bytes</span>
+            </div>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: 'var(--bg)' }}>
+                {profile.selfdestruct_count > 0 && <div style={{ flex: profile.selfdestruct_count, background: DNA_COLORS.selfdestruct }} title="SELFDESTRUCT" />}
+                {profile.delegatecall_count > 0 && <div style={{ flex: profile.delegatecall_count, background: DNA_COLORS.delegatecall }} title="DELEGATECALL" />}
+                {profile.create2_count > 0 && <div style={{ flex: profile.create2_count, background: DNA_COLORS.create2 }} title="CREATE2" />}
+                {profile.sstore_count > 0 && <div style={{ flex: profile.sstore_count, background: DNA_COLORS.sstore }} title="SSTORE" />}
+                <div style={{ flex: 100, background: DNA_COLORS.other }} title="Safe Bytecode" />
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
+                {profile.selfdestruct_count > 0 && <div className="step-kv"><div style={{ width: 6, height: 6, background: DNA_COLORS.selfdestruct, borderRadius: '50%' }} /> <span className="warning">SELFDESTRUCT</span></div>}
+                {profile.delegatecall_count > 0 && <div className="step-kv"><div style={{ width: 6, height: 6, background: DNA_COLORS.delegatecall, borderRadius: '50%' }} /> <span className="warning">DELEGATECALL</span></div>}
+                {profile.sstore_count > 0 && <div className="step-kv"><div style={{ width: 6, height: 6, background: DNA_COLORS.sstore, borderRadius: '50%' }} /> <span>State Writes ({profile.sstore_count})</span></div>}
+            </div>
+        </div>
+    )
+}
+
+function AssetFlow({ diff }) {
+    if (!diff) return null
+    const senderDelta = (diff.sender_balance_delta_wei / 1e18).toFixed(6)
+    const receiverDelta = (diff.receiver_balance_delta_wei / 1e18).toFixed(6)
+
+    return (
+        <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--border)', borderRadius: 4 }}>
+            <div className="risk-label" style={{ marginBottom: 12 }}>Asset Flow & State Impact</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div className="mono" style={{ color: 'var(--dim)' }}>SENDER</div>
+                    <div style={{ color: parseFloat(senderDelta) < 0 ? 'var(--red)' : 'var(--green)', fontWeight: 700 }}>
+                        {parseFloat(senderDelta) > 0 ? '+' : ''}{senderDelta} ETH
+                    </div>
+                </div>
+                <div style={{ color: 'var(--dim)', fontSize: '1.2rem' }}>➞</div>
+                <div style={{ textAlign: 'center' }}>
+                    <div className="mono" style={{ color: 'var(--dim)' }}>RECEIVER</div>
+                    <div style={{ color: parseFloat(receiverDelta) > 0 ? 'var(--green)' : 'var(--fg)', fontWeight: 700 }}>
+                        {parseFloat(receiverDelta) > 0 ? '+' : ''}{receiverDelta} ETH
+                    </div>
+                </div>
+            </div>
+            {diff.ownership_changed && (
+                <div style={{ marginTop: 12, padding: '4px 8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--red)', color: 'var(--red)', fontSize: '0.7rem', textAlign: 'center', borderRadius: 4 }}>
+                    ⚠ CRITICAL: CONTRACT OWNERSHIP TRANSFERRED
+                </div>
+            )}
+        </div>
+    )
+}
+
 function RiskResult({ result, onReplay }) {
     if (!result) return null
-    const risk = result.record?.risk_report || {}
-    const exec = result.record?.execution_result || {}
+    const rec = result.record || {}
+    const risk = rec.risk_report || {}
+    const exec = rec.execution_result || {}
+    const diff = rec.state_diff || {}
+    const profile = rec.opcode_profile || {}
+    const behave = rec.behavior_report || {}
+
     const score = risk.score ?? 0
     const level = risk.level ?? 'LOW'
     const rules = risk.triggered_rules || []
     const violations = risk.policy_violations || []
-    const rec = risk.recommendation || ''
+    const flags = behave.behavior_flags || []
 
     return (
         <div className="risk-result">
             <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--dim)', marginBottom: 16 }}>
                 ── RISK ASSESSMENT ──────────────────────────────────────────
             </div>
+
+            {/* Score Header */}
             <div className="risk-score-row">
                 <div>
                     <div className="risk-label">Risk Score</div>
                     <div className={`risk-score-num ${level}`}>{score}</div>
                     <div className="risk-label">/ 100</div>
                 </div>
-                <div>
-                    <div className="risk-label" style={{ marginBottom: 8 }}>Level</div>
+                <div style={{ flex: 2 }}>
+                    <div className="risk-label" style={{ marginBottom: 8 }}>Verdict</div>
                     <div className={`risk-level-badge ${level}`}>{level}</div>
-                    <div style={{ marginTop: 12, fontSize: '0.75rem', color: 'var(--dim)', maxWidth: 300 }}>{rec}</div>
-                </div>
-                <div>
-                    <div className="risk-label" style={{ marginBottom: 8 }}>Execution</div>
-                    <div style={{ fontSize: '0.78rem' }}>
-                        <div className="step-kv" style={{ marginBottom: 4 }}>
-                            <span className="step-kv-key">Success</span>
-                            <span className={`step-kv-val ${exec.success ? 'good' : 'bad'}`}>{exec.success ? 'YES' : 'NO'}</span>
-                        </div>
-                        <div className="step-kv" style={{ marginBottom: 4 }}>
-                            <span className="step-kv-key">Gas Used</span>
-                            <span className="step-kv-val">{exec.gas_used?.toLocaleString()}</span>
-                        </div>
-                        <div className="step-kv" style={{ marginBottom: 4 }}>
-                            <span className="step-kv-key">Reverted</span>
-                            <span className={`step-kv-val ${exec.reverted ? 'bad' : 'good'}`}>{exec.reverted ? 'YES' : 'NO'}</span>
-                        </div>
-                        {exec.revert_reason && (
-                            <div className="step-kv">
-                                <span className="step-kv-key">Reason</span>
-                                <span className="step-kv-val bad" style={{ fontSize: '0.68rem' }}>{exec.revert_reason}</span>
-                            </div>
-                        )}
-                    </div>
+                    <div style={{ marginTop: 12, fontSize: '0.75rem', color: 'var(--dim)' }}>{risk.recommendation}</div>
                 </div>
             </div>
 
@@ -177,12 +233,20 @@ function RiskResult({ result, onReplay }) {
                 <div className={`risk-bar-fill ${level}`} style={{ width: `${score}%` }} />
             </div>
 
-            {rules.length > 0 && (
-                <div className="triggered-rules">
+            {/* Visual Attack Graph Components */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <CodeDNA profile={profile} />
+                <AssetFlow diff={diff} />
+            </div>
+
+            {/* Rules & Flags */}
+            {(rules.length > 0 || flags.length > 0) && (
+                <div className="triggered-rules" style={{ marginTop: 16 }}>
                     <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--dim)', marginBottom: 6 }}>
-                        Triggered Rules ({rules.length})
+                        Detection Vectors
                     </div>
-                    {rules.map((r, i) => <div key={i} className="rule-item">▸ {r}</div>)}
+                    {rules.map((r, i) => <div key={`r-${i}`} className="rule-item">🎯 {r}</div>)}
+                    {flags.map((f, i) => <div key={`f-${i}`} className="rule-item" style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}>👁 {f.replace(/_/g, ' ')}</div>)}
                 </div>
             )}
 
@@ -197,26 +261,20 @@ function RiskResult({ result, onReplay }) {
 
             <div style={{ marginTop: 16, padding: '12px 16px', border: '1px solid var(--border)', fontSize: '0.75rem' }}>
                 <div style={{ color: 'var(--dim)', marginBottom: 6, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Simulation Summary</div>
-                <div className="step-kv"><span className="step-kv-key">Simulation ID</span><span className="step-kv-val mono">{result.record?.simulation_id}</span></div>
-                <div className="step-kv"><span className="step-kv-key">Execution Time</span><span className="step-kv-val">{result.execution_time_s?.toFixed(2)}s</span></div>
-                <div className="step-kv"><span className="step-kv-key">Deterministic Hash</span><span className="step-kv-val dim mono">{result.record?.deterministic_hash?.slice(0, 32)}…</span></div>
-                <div className="step-kv"><span className="step-kv-key">Network</span><span className="step-kv-val good">Ethereum Mainnet (Chain 1)</span></div>
-
+                <div className="step-kv"><span className="step-kv-key">Simulation ID</span><span className="step-kv-val mono">{rec.simulation_id}</span></div>
+                <div className="step-kv"><span className="step-kv-key">Execution Time</span><span className="step-kv-val">{rec.execution_time_s?.toFixed(2)}s</span></div>
+                <div className="step-kv"><span className="step-kv-key">Gas Used</span><span className="step-kv-val">{exec.gas_used?.toLocaleString()}</span></div>
+                <div className="step-kv"><span className="step-kv-key">Network</span><span className="step-kv-val good">Ethereum Mainnet (Live)</span></div>
             </div>
 
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => {
-                    const url = new URL(window.location.href)
-                    url.searchParams.set('sim', result.record?.simulation_id || '')
-                    navigator.clipboard.writeText(url.toString())
-                }}>⎘ Copy Link</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => {
-                    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
+                    const blob = new Blob([JSON.stringify(rec, null, 2)], { type: 'application/json' })
                     const a = document.createElement('a')
                     a.href = URL.createObjectURL(blob)
-                    a.download = `${result.record?.simulation_id || 'sim'}.json`
+                    a.download = `${rec.simulation_id || 'sim'}.json`
                     a.click()
-                }}>↓ Export JSON</button>
+                }}>↓ Export Full Report</button>
             </div>
         </div>
     )

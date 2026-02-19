@@ -14,7 +14,8 @@ function StatCard({ label, value, sub, accent }) {
 }
 
 function MiniBar({ label, count, total, color }) {
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0
+    const safeTotal = total > 0 ? total : 1
+    const pct = total > 0 ? Math.round((count / safeTotal) * 100) : 0
     return (
         <div style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: 4 }}>
@@ -29,19 +30,21 @@ function MiniBar({ label, count, total, color }) {
 }
 
 function ActivityChart({ data }) {
-    const max = Math.max(...data.map(d => d.count), 1)
+    if (!data || !Array.isArray(data) || data.length === 0) return <div className="dim" style={{ fontSize: '0.8rem', padding: 10 }}>No activity data</div>
+
+    const max = Math.max(...data.map(d => d.count || 0), 1)
     return (
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 60, marginTop: 8 }}>
             {data.map((d, i) => (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                     <div style={{
                         width: '100%',
-                        height: `${Math.max((d.count / max) * 52, d.count > 0 ? 4 : 0)}px`,
-                        background: d.count > 0 ? 'var(--yellow)' : 'var(--border)',
+                        height: `${Math.max(((d.count || 0) / max) * 52, (d.count || 0) > 0 ? 4 : 0)}px`,
+                        background: (d.count || 0) > 0 ? 'var(--yellow)' : 'var(--border)',
                         transition: 'height 0.4s ease',
-                        opacity: d.count > 0 ? 1 : 0.3,
+                        opacity: (d.count || 0) > 0 ? 1 : 0.3,
                     }} title={`${d.date}: ${d.count} simulations`} />
-                    <span style={{ fontSize: '0.55rem', color: 'var(--dim)' }}>{d.date.slice(5)}</span>
+                    <span style={{ fontSize: '0.55rem', color: 'var(--dim)' }}>{d.date ? d.date.slice(5) : '-'}</span>
                 </div>
             ))}
         </div>
@@ -53,10 +56,25 @@ export default function Dashboard() {
     const [net, setNet] = useState(null)
     const [loading, setLoading] = useState(true)
     const [blockHistory, setBlockHistory] = useState([])
+    const [recentSims, setRecentSims] = useState([])
     const intervalRef = useRef(null)
 
     const loadStats = () => {
-        fetch('/api/stats').then(r => r.json()).then(d => { setStats(d); setLoading(false) }).catch(() => setLoading(false))
+        fetch('/api/stats').then(r => r.json()).then(d => {
+            setStats(d)
+            if (d.recent && Array.isArray(d.recent)) {
+                setRecentSims(prev => {
+                    const newIds = new Set(prev.map(p => p.simulation_id))
+                    const uniqueNew = d.recent.filter(r => !newIds.has(r.simulation_id))
+                    // Prepend new ones
+                    const combined = [...uniqueNew, ...prev]
+                    // Optional: limit to 50 or 100 to avoid memory leak if running for days, though user asked for infinite. 
+                    // Let's keep 100 for now to be safe but "feeling" infinite.
+                    return combined.slice(0, 100)
+                })
+            }
+            setLoading(false)
+        }).catch(() => setLoading(false))
     }
 
     const loadNet = () => {
@@ -72,7 +90,10 @@ export default function Dashboard() {
     useEffect(() => {
         loadStats()
         loadNet()
-        intervalRef.current = setInterval(() => { loadNet() }, 12000)
+        intervalRef.current = setInterval(() => {
+            loadNet()
+            loadStats()
+        }, 5000) // Poll every 5s for live feed
         return () => clearInterval(intervalRef.current)
     }, [])
 
@@ -102,8 +123,8 @@ export default function Dashboard() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                         {[
                             { label: 'Block Number', value: net?.block?.toLocaleString() ?? '…', accent: 'var(--yellow)' },
-                            { label: 'Gas Price', value: net?.gas_price_gwei ? `${net.gas_price_gwei.toFixed(3)} Gwei` : '…', accent: 'var(--green)' },
-                            { label: 'Base Fee', value: net?.base_fee_gwei ? `${net.base_fee_gwei.toFixed(3)} Gwei` : '…', accent: 'var(--dim)' },
+                            { label: 'Gas Price', value: net?.gas_price_gwei ? `${Number(net.gas_price_gwei).toFixed(3)} Gwei` : '…', accent: 'var(--green)' },
+                            { label: 'Base Fee', value: net?.base_fee_gwei ? `${Number(net.base_fee_gwei).toFixed(3)} Gwei` : '…', accent: 'var(--dim)' },
                             { label: 'Chain ID', value: net?.chain_id ?? '…', accent: 'var(--dim)' },
                         ].map(c => (
                             <div key={c.label} style={{ textAlign: 'center', padding: '12px 0' }}>
@@ -121,7 +142,7 @@ export default function Dashboard() {
                                     const h = Math.max(((b.gas || 0) / maxG) * 28, 2)
                                     return (
                                         <div key={i} style={{ flex: 1, height: `${h}px`, background: 'var(--yellow)', opacity: 0.4 + (i / blockHistory.length) * 0.6 }}
-                                            title={`${b.time}: ${b.gas?.toFixed(3)} Gwei`} />
+                                            title={`${b.time}: ${Number(b.gas).toFixed(3)} Gwei`} />
                                     )
                                 })}
                             </div>
@@ -131,7 +152,7 @@ export default function Dashboard() {
             </div>
 
             {/* Stats Cards */}
-            {loading ? (
+            {loading && !stats ? (
                 <div style={{ padding: 32, textAlign: 'center', color: 'var(--dim)' }}><span className="spinner" /> Loading analytics…</div>
             ) : (
                 <>
@@ -190,20 +211,26 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* Recent Simulations */}
+                        {/* Recent Simulations (Live Feed) */}
                         <div className="panel">
-                            <div className="panel-header"><span className="panel-title">Recent Simulations</span></div>
-                            <div className="panel-body">
-                                {(stats?.recent || []).length === 0 ? (
-                                    <div className="dim" style={{ fontSize: '0.8rem' }}>No simulations yet</div>
+                            <div className="panel-header">
+                                <span className="panel-title">Live Feed</span>
+                                <span className="tag tag-green" style={{ fontSize: '0.6rem', marginLeft: 8 }}>LIVE</span>
+                            </div>
+                            <div className="panel-body" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                {recentSims.length === 0 ? (
+                                    <div className="dim" style={{ fontSize: '0.8rem' }}>Waiting for simulations...</div>
                                 ) : (
-                                    stats.recent.map((r, i) => (
-                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < stats.recent.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                                    recentSims.map((r, i) => (
+                                        <div key={`${r.simulation_id}-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                                             <div>
                                                 <div style={{ fontSize: '0.72rem', color: 'var(--yellow)', fontFamily: 'monospace' }}>{r.simulation_id}</div>
                                                 <div style={{ fontSize: '0.65rem', color: 'var(--dim)' }}>{r.to?.slice(0, 10)}… · {r.execution_time_s?.toFixed(1)}s</div>
                                             </div>
-                                            <span className={`tag ${LEVEL_TAG[r.level] || 'tag-green'}`} style={{ fontSize: '0.6rem' }}>{r.level}</span>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <span className={`tag ${LEVEL_TAG[r.level] || 'tag-green'}`} style={{ fontSize: '0.6rem' }}>{r.level}</span>
+                                                <div style={{ fontSize: '0.55rem', color: 'var(--dim)', marginTop: 2 }}>{new Date(r.timestamp).toLocaleTimeString()}</div>
+                                            </div>
                                         </div>
                                     ))
                                 )}
