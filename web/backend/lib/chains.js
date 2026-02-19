@@ -60,10 +60,37 @@ function getHttpProvider(network = 'ethereum') {
     return _httpProviders[network];
 }
 
-// WebSocket providers are created fresh each time (stateful streams)
+// WebSocket providers with heartbeats and auto-reconnect logic
 function getWsProvider(network = 'ethereum') {
     const cfg = CHAIN_CONFIGS[network] || CHAIN_CONFIGS.ethereum;
-    return new ethers.WebSocketProvider(cfg.rpcWs);
+
+    // Use a custom provider that handles heartbeats
+    const provider = new ethers.WebSocketProvider(cfg.rpcWs);
+
+    // Monitor the underlying websocket
+    const socket = provider.websocket;
+    if (socket) {
+        socket.onopen = () => {
+            console.log(`[ws] ${network} connection opened`);
+        };
+        socket.onclose = (code) => {
+            console.warn(`[ws] ${network} connection closed (code: ${code})`);
+        };
+        socket.onerror = (err) => {
+            console.error(`[ws] ${network} connection error:`, err.message);
+        };
+
+        // Keep-alive heartbeat (if supported by node)
+        const pingInterval = setInterval(() => {
+            if (socket.readyState === 1) { // OPEN
+                socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 999 }));
+            }
+        }, 15000);
+
+        provider._interval = pingInterval;
+    }
+
+    return provider;
 }
 
 function getChainConfig(network = 'ethereum') {

@@ -188,12 +188,12 @@ export default function Live() {
                     className="table-container"
                     ref={containerRef}
                     onScroll={(e) => {
-                        // Check if user is near top (within 50px)
-                        isAtTopRef.current = e.target.scrollTop < 50
+                        // Tighten threshold: only stick if truly at the top
+                        isAtTopRef.current = e.target.scrollTop < 10
                     }}
                     style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}
                 >
-                    <table className="data-table" style={{ width: '100%' }}>
+                    <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--dim)' }}>
                                 <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: 600 }}>HASH</th>
@@ -205,8 +205,8 @@ export default function Live() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((tx, idx) => (
-                                <TransactionRow key={tx.hash + idx} tx={tx} onAnalyze={handleAnalyze} />
+                            {filtered.map((tx) => (
+                                <TransactionRow key={tx.hash} tx={tx} onAnalyze={handleAnalyze} />
                             ))}
                             {filtered.length === 0 && (
                                 <tr>

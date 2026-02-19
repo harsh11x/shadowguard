@@ -84,12 +84,15 @@ router.get('/stream', async (req, res) => {
 
     let provider;
     let txCount = 0;
+    let lastDataAt = Date.now();
+
     try {
         provider = getWsProvider(network);
 
         send({ type: 'connected', network, chain_id: cfg.id, message: `Connected to ${cfg.name} mempool` });
 
         provider.on('pending', async (txHash) => {
+            lastDataAt = Date.now();
             try {
                 const tx = await provider.getTransaction(txHash);
                 if (!tx) return;
@@ -115,9 +118,7 @@ router.get('/stream', async (req, res) => {
                     network,
                     timestamp: new Date().toISOString(),
                 });
-            } catch (_) {
-                // Transaction not found or network error — skip silently
-            }
+            } catch (_) { }
         });
 
         provider.on('error', (err) => {
@@ -125,10 +126,20 @@ router.get('/stream', async (req, res) => {
             send({ type: 'error', message: 'WebSocket error: ' + err.message });
         });
 
+        // Watchdog: If no data for 2 minutes on a busy network, signal an error to trigger frontend retry
+        const watchdog = setInterval(() => {
+            const idleTime = Date.now() - lastDataAt;
+            if (idleTime > 120000 && txCount > 0) {
+                console.warn(`[live] ${network} stream stalled (no data for 120s). Triggering retry.`);
+                send({ type: 'error', message: 'Stream stalled — reconnecting...' });
+                res.end(); // Closing the response triggers EventSource auto-retry
+            }
+        }, 30000);
+
         // Keep-alive ping every 30s to prevent SSE timeout
         const keepAlive = setInterval(() => {
             send({ type: 'ping', timestamp: new Date().toISOString() });
-        }, 30000);
+        }, 15000);
 
     } catch (err) {
         send({ type: 'error', message: `Failed to connect to ${network}: ${err.message}` });
@@ -139,8 +150,10 @@ router.get('/stream', async (req, res) => {
     req.on('close', () => {
         console.log(`[live] Client disconnected from ${network} stream (${txCount} tx sent)`);
         clearInterval(keepAlive);
+        clearInterval(watchdog);
         try {
             if (provider) {
+                if (provider._interval) clearInterval(provider._interval);
                 provider.removeAllListeners();
                 provider.destroy();
             }
