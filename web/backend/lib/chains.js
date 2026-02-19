@@ -83,8 +83,8 @@ function getWsProvider(network = 'ethereum') {
         socket.onopen = () => {
             console.log(`[ws] ${network} connection opened`);
         };
-        socket.onclose = (code) => {
-            console.warn(`[ws] ${network} connection closed (code: ${code})`);
+        socket.onclose = (event) => {
+            console.warn(`[ws] ${network} connection closed (code: ${event.code}, reason: ${event.reason})`);
         };
         socket.onerror = (err) => {
             console.error(`[ws] ${network} connection error:`, err.message);

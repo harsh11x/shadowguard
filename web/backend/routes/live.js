@@ -85,6 +85,8 @@ router.get('/stream', async (req, res) => {
     let provider;
     let txCount = 0;
     let lastDataAt = Date.now();
+    let keepAlive;
+    let watchdog;
 
     try {
         provider = getWsProvider(network);
@@ -127,7 +129,7 @@ router.get('/stream', async (req, res) => {
         });
 
         // Watchdog: If no data for some time, signal an error to trigger frontend retry
-        const watchdog = setInterval(() => {
+        watchdog = setInterval(() => {
             const idleTime = Date.now() - lastDataAt;
             const isQuietNetwork = ['sepolia'].includes(network);
             const timeout = isQuietNetwork ? 300000 : 45000; // 45s for busy networks
@@ -139,7 +141,7 @@ router.get('/stream', async (req, res) => {
         }, 15000);
 
         // Keep-alive ping every 15s to prevent SSE timeout
-        const keepAlive = setInterval(() => {
+        keepAlive = setInterval(() => {
             send({ type: 'ping', timestamp: new Date().toISOString() });
         }, 15000);
 
@@ -151,8 +153,8 @@ router.get('/stream', async (req, res) => {
 
     req.on('close', () => {
         console.log(`[live] Client disconnected from ${network} stream (${txCount} tx sent)`);
-        clearInterval(keepAlive);
-        clearInterval(watchdog);
+        if (keepAlive) clearInterval(keepAlive);
+        if (watchdog) clearInterval(watchdog);
         try {
             if (provider) {
                 if (provider._interval) clearInterval(provider._interval);
