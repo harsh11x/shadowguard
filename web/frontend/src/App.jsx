@@ -32,11 +32,11 @@ function NetworkBar() {
                 <span className="dim">Connecting…</span>
             ) : net && !net.error ? (
                 <>
-                    <span className="dim">MAINNET</span>
+                    <span className="dim">{net.name || 'MAINNET'}</span>
 
                     <span>#{net.block?.toLocaleString()}</span>
                     <span className="dim">|</span>
-                    <span>{net.gas_price_gwei?.toFixed(2)} Gwei</span>
+                    <span>{net.gas_price_gwei} Gwei</span>
                     <span className="dim">|</span>
                     <span className="good" style={{ fontSize: '0.65rem' }}>● LIVE</span>
                 </>
