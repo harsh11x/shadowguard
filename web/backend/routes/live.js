@@ -95,9 +95,14 @@ router.get('/stream', async (req, res) => {
 
         provider.on('pending', async (txHash) => {
             lastDataAt = Date.now();
+            if (txCount % 100 === 0) console.log(`[live] Received hash: ${txHash} (${txCount} sent so far)`);
+
             try {
                 const tx = await provider.getTransaction(txHash);
-                if (!tx) return;
+                if (!tx) {
+                    // console.debug(`[live] Tx not found for hash: ${txHash}`);
+                    return;
+                }
 
                 txCount++;
                 const { score, reasons } = computeRiskScore(tx);
@@ -120,7 +125,9 @@ router.get('/stream', async (req, res) => {
                     network,
                     timestamp: new Date().toISOString(),
                 });
-            } catch (_) { }
+            } catch (pErr) {
+                console.error(`[live] Error processing tx ${txHash}:`, pErr.message);
+            }
         });
 
         provider.on('error', (err) => {
@@ -128,17 +135,62 @@ router.get('/stream', async (req, res) => {
             // Don't send error to frontend immediately to allow auto-reconnect attempt
         });
 
-        // Watchdog: If no data for some time, signal an error to trigger frontend retry
+        // Block Fallback: If pending is silent, pull transactions from new blocks
+        provider.on('block', async (blockNumber) => {
+            console.log(`[live] New block on ${network}: ${blockNumber}`);
+            lastDataAt = Date.now();
+
+            try {
+                // Get block with transactions
+                const block = await provider.getBlock(blockNumber, true);
+                if (!block || !block.transactions) return;
+
+                const txs = block.transactions;
+                console.log(`[live] ${network} block ${blockNumber} contains ${txs.length} transactions`);
+
+                // Limit fallback to 20 txs to avoid overwhelming the stream
+                const subset = txs.slice(0, 20);
+
+                for (const tx of subset) {
+                    const { score, reasons } = computeRiskScore(tx);
+                    const risk = classifyRisk(score);
+
+                    send({
+                        type: 'tx',
+                        hash: tx.hash,
+                        from: tx.from,
+                        to: tx.to,
+                        value: tx.value?.toString() || '0',
+                        value_eth: parseFloat(ethers.formatEther(tx.value || 0n)).toFixed(6),
+                        gas_limit: tx.gasLimit?.toString(),
+                        data: tx.data?.slice(0, 66) || '0x',
+                        has_data: (tx.data?.length || 0) > 2,
+                        known_contract: KNOWN_CONTRACTS[tx.to?.toLowerCase()] || null,
+                        risk_score: score,
+                        risk_level: risk,
+                        risk_reasons: reasons,
+                        network,
+                        is_finalized: true, // Mark as block-confirmed
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+            } catch (bErr) {
+                console.error(`[live] Error processing block ${blockNumber}:`, bErr.message);
+            }
+        });
+
+        // Watchdog: If no data (no pending AND no blocks) for some time, signal an error to trigger frontend retry
         watchdog = setInterval(() => {
             const idleTime = Date.now() - lastDataAt;
             const isQuietNetwork = ['sepolia'].includes(network);
-            const timeout = isQuietNetwork ? 300000 : 45000; // 45s for busy networks
+            // More generous for blocks (since blocks are ~12-15s)
+            const timeout = isQuietNetwork ? 600000 : 90000;
 
             if (idleTime > timeout) {
                 console.warn(`[live] ${network} stream stalled (no data for ${timeout / 1000}s). Triggering retry.`);
                 res.end(); // Closing the response triggers EventSource auto-retry
             }
-        }, 15000);
+        }, 30000);
 
         // Keep-alive ping every 15s to prevent SSE timeout
         keepAlive = setInterval(() => {

@@ -12,7 +12,7 @@ const CHAIN_CONFIGS = {
         name: 'Ethereum Mainnet',
         symbol: 'ETH',
         rpcHttp: process.env.ETH_RPC_URL || 'https://eth.llamarpc.com',
-        rpcWs: (process.env.ETH_WS_URL || 'wss://eth.llamarpc.com,wss://ethereum-rpc.publicnode.com,wss://eth.drpc.org').split(','),
+        rpcWs: (process.env.ETH_WS_URL || 'wss://eth.drpc.org,wss://ethereum-rpc.publicnode.com,wss://eth.llamarpc.com').split(','),
         explorer: 'https://etherscan.io',
     },
     sepolia: {
