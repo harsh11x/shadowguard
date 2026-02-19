@@ -125,6 +125,11 @@ router.get('/stream', async (req, res) => {
             send({ type: 'error', message: 'WebSocket error: ' + err.message });
         });
 
+        // Keep-alive ping every 30s to prevent SSE timeout
+        const keepAlive = setInterval(() => {
+            send({ type: 'ping', timestamp: new Date().toISOString() });
+        }, 30000);
+
     } catch (err) {
         send({ type: 'error', message: `Failed to connect to ${network}: ${err.message}` });
         res.end();
@@ -133,8 +138,12 @@ router.get('/stream', async (req, res) => {
 
     req.on('close', () => {
         console.log(`[live] Client disconnected from ${network} stream (${txCount} tx sent)`);
+        clearInterval(keepAlive);
         try {
-            if (provider) provider.destroy();
+            if (provider) {
+                provider.removeAllListeners();
+                provider.destroy();
+            }
         } catch (_) { }
     });
 });
