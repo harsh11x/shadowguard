@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 // Real Sepolia deployed contracts
 const PRESETS = [
@@ -179,7 +179,7 @@ function AssetFlow({ diff }) {
                 </div>
                 <div style={{ color: 'var(--dim)', fontSize: '1.2rem' }}>➞</div>
                 <div style={{ textAlign: 'center' }}>
-                    <div className="mono" style={{ color: 'var(--dim)' }}>RECEIVER</div>
+                    <div style={{ color: 'var(--dim)' }}>RECEIVER</div>
                     <div style={{ color: parseFloat(receiverDelta) > 0 ? 'var(--green)' : 'var(--fg)', fontWeight: 700 }}>
                         {parseFloat(receiverDelta) > 0 ? '+' : ''}{receiverDelta} ETH
                     </div>
@@ -282,11 +282,12 @@ function RiskResult({ result, onReplay }) {
 
 export default function Simulate() {
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
     const [form, setForm] = useState({
-        from: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-        to: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9',
-        value: '0',
-        data: '0x',
+        from: searchParams.get('from') || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+        to: searchParams.get('to') || '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9',
+        value: searchParams.get('value') || '0',
+        data: searchParams.get('data') || '0x',
     })
     const [running, setRunning] = useState(false)
     const [steps, setSteps] = useState([])
@@ -299,6 +300,7 @@ export default function Simulate() {
     const [showBook, setShowBook] = useState(false)
     const [decodedSelector, setDecodedSelector] = useState(null)
     const esRef = useRef(null)
+    const autoRunTriggered = useRef(false)
 
     // Decode selector on calldata change
     useEffect(() => {
@@ -342,6 +344,19 @@ export default function Simulate() {
             return [...prev, { step: stepNum, status, data }]
         })
     }, [])
+
+    // Auto-run if params are provided
+    useEffect(() => {
+        const txHash = searchParams.get('hash')
+        const from = searchParams.get('from')
+        const to = searchParams.get('to')
+
+        if (!autoRunTriggered.current && from && to) {
+            autoRunTriggered.current = true
+            console.log('[Simulate] Auto-running for transaction:', txHash || 'direct')
+            runSimulation()
+        }
+    }, [searchParams])
 
     const validate = () => {
         const addrRegex = /^0x[a-fA-F0-9]{40}$/

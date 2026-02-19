@@ -135,7 +135,13 @@ export default function Live() {
     }, [network])
 
     const handleAnalyze = (tx) => {
-        const params = new URLSearchParams({ from: tx.from, to: tx.to || '', value: tx.value_eth || '0', data: tx.has_data ? tx.data : '0x' })
+        const params = new URLSearchParams({
+            hash: tx.hash,
+            from: tx.from,
+            to: tx.to || '',
+            value: tx.value_eth || '0',
+            data: tx.has_data ? tx.data : '0x'
+        })
         navigate(`/?${params.toString()}`)
     }
 
