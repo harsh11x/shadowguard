@@ -81,14 +81,15 @@ router.get('/stream', async (req, res) => {
         try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch (_) { }
     };
 
-    console.log(`[live] Starting WebSocket stream for ${network}...`);
-
-    let provider;
+    // Initialize all to null to prevent ReferenceErrors
+    let provider = null;
+    let keepAlive = null;
+    let watchdog = null;
+    let poller = null;
     let txCount = 0;
     let lastDataAt = Date.now();
-    let keepAlive;
-    let watchdog;
-    let poller;
+
+    console.log(`[live] ENGINE_START_V3 for ${network}...`);
 
     try {
         provider = getWsProvider(network);
@@ -101,10 +102,7 @@ router.get('/stream', async (req, res) => {
 
             try {
                 const tx = await provider.getTransaction(txHash);
-                if (!tx) {
-                    // console.debug(`[live] Tx not found for hash: ${txHash}`);
-                    return;
-                }
+                if (!tx) return;
 
                 txCount++;
                 const { score, reasons } = computeRiskScore(tx);
@@ -115,9 +113,7 @@ router.get('/stream', async (req, res) => {
                     hash: tx.hash,
                     from: tx.from,
                     to: tx.to,
-                    value: tx.value?.toString() || '0',
                     value_eth: parseFloat(ethers.formatEther(tx.value || 0n)).toFixed(6),
-                    gas_limit: tx.gasLimit?.toString(),
                     data: tx.data?.slice(0, 66) || '0x',
                     has_data: (tx.data?.length || 0) > 2,
                     known_contract: KNOWN_CONTRACTS[tx.to?.toLowerCase()] || null,
@@ -176,6 +172,7 @@ router.get('/stream', async (req, res) => {
         let lastPolledBlock = 0;
         poller = setInterval(async () => {
             try {
+                if (!provider) return;
                 const currentBlock = await provider.getBlockNumber();
                 if (currentBlock > lastPolledBlock) {
                     if (lastPolledBlock > 0) await processBlock(currentBlock);
@@ -203,6 +200,7 @@ router.get('/stream', async (req, res) => {
         }, 15000);
 
     } catch (err) {
+        console.error(`[live] Critical setup error: ${err.message}`);
         send({ type: 'error', message: `Failed to connect to ${network}: ${err.message}` });
         res.end();
         return;
@@ -210,14 +208,18 @@ router.get('/stream', async (req, res) => {
 
     req.on('close', () => {
         console.log(`[live] Client disconnected from ${network} stream (${txCount} tx sent)`);
-        if (keepAlive) clearInterval(keepAlive);
-        if (watchdog) clearInterval(watchdog);
-        if (poller) clearInterval(poller);
+
+        // Final protection against ReferenceErrors or duplicate closures
+        try { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } } catch (_) { }
+        try { if (watchdog) { clearInterval(watchdog); watchdog = null; } } catch (_) { }
+        try { if (poller) { clearInterval(poller); poller = null; } } catch (_) { }
+
         try {
             if (provider) {
-                if (provider._interval) clearInterval(provider._interval);
                 provider.removeAllListeners();
-                provider.destroy();
+                // Ensure provider is actually destroyed
+                provider.destroy().catch(() => { });
+                provider = null;
             }
         } catch (_) { }
     });
