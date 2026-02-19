@@ -27,9 +27,21 @@ const firebaseConfig = {
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "shadowguard-demo",
 }
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-const auth = getAuth(app)
-const googleProvider = new GoogleAuthProvider()
+// ── Firebase lazy init (safe — won't crash app if config is missing) ──────────
+let _auth = null
+let _googleProvider = null
+
+function getFirebaseAuth() {
+    if (_auth) return _auth
+    try {
+        const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+        _auth = getAuth(firebaseApp)
+        _googleProvider = new GoogleAuthProvider()
+    } catch (e) {
+        console.warn('[Developer] Firebase init failed:', e.message)
+    }
+    return _auth
+}
 
 // ── Plans ─────────────────────────────────────────────────────────────────────
 const PLANS = [
@@ -130,7 +142,7 @@ function AuthGate({ onUser }) {
     const handleGoogle = async () => {
         setLoading(true); setError('')
         try {
-            const result = await signInWithPopup(auth, googleProvider)
+            const result = await signInWithPopup(getFirebaseAuth(), _googleProvider)
             onUser(result.user)
         } catch (e) { setError(e.message) } finally { setLoading(false) }
     }
@@ -251,7 +263,9 @@ export default function Developer() {
     const [success, setSuccess] = useState('')
 
     useEffect(() => {
-        const unsub = onAuthStateChanged(auth, (u) => {
+        const firebaseAuth = getFirebaseAuth()
+        if (!firebaseAuth) { setLoadingAuth(false); return }
+        const unsub = onAuthStateChanged(firebaseAuth, (u) => {
             setUser(u)
             setLoadingAuth(false)
         })
@@ -352,7 +366,7 @@ export default function Developer() {
                     <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 4 }}>Developer Portal</h1>
                     <p style={{ color: 'var(--dim)', fontSize: '0.82rem' }}>{user.email}</p>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => signOut(auth).then(() => setUser(null))}>Sign Out</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { const a = getFirebaseAuth(); if (a) signOut(a).then(() => setUser(null)) }}>Sign Out</button>
             </div>
 
             {/* Tabs */}
