@@ -105,6 +105,7 @@ export default function Live() {
             try {
                 const data = JSON.parse(e.data)
                 if (data.type === 'connected') {
+                    console.log('[Live] SSE Connected:', data)
                     setIsStreaming(true)
                     setStatus(data.message || 'Connected')
                 } else if (data.type === 'tx') {
@@ -112,13 +113,17 @@ export default function Live() {
                     setTxs(prev => [data, ...prev])
                     setCount(c => c + 1)
                 } else if (data.type === 'error') {
+                    console.error('[Live] SSE Application Error:', data.message)
                     setStatus(`Error: ${data.message}`)
                     setIsStreaming(false)
                 }
-            } catch (_) { }
+            } catch (err) {
+                console.error('[Live] SSE Parse Error:', err)
+            }
         }
 
-        es.onerror = () => {
+        es.onerror = (err) => {
+            console.error('[Live] SSE Connection Lost:', err)
             setIsStreaming(false)
             setStatus('Connection lost — retrying…')
         }

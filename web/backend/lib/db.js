@@ -64,21 +64,27 @@ const SCHEMA = `
     CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 `;
 
-// Initialize schema
-(async () => {
+// Initialize schema (non-blocking for server start)
+async function initDb() {
     try {
-        await pool.query(SCHEMA);
-        // Migration: Add key_raw if not exists (dempotent)
-        await pool.query(SCHEMA);
-        // Migration: Add key_raw if not exists (dempotent)
-        await pool.query(`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_raw TEXT;`);
-        // Migration: Set default status to pending for NEW users
-        await pool.query(`ALTER TABLE users ALTER COLUMN status SET DEFAULT 'pending';`);
-        console.log('[db] Schema initialized');
+        console.log('[db] Connecting to database...');
+        const client = await pool.connect();
+        try {
+            await client.query(SCHEMA);
+            await client.query(`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_raw TEXT;`);
+            await client.query(`ALTER TABLE users ALTER COLUMN status SET DEFAULT 'pending';`);
+            console.log('[db] Schema initialized');
+        } finally {
+            client.release();
+        }
     } catch (e) {
-        console.error('[db] Schema init failed:', e.message);
+        console.error('[db] Database connection or schema init failed:', e.message);
+        console.warn('[db] Running in limited mode (some developer features may be unavailable)');
     }
-})();
+}
+
+// Start init but don't await blocking
+initDb();
 
 // ── Plan definitions ────────────────────────────────────────────────────────
 const PLANS = {
