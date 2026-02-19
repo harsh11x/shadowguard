@@ -73,6 +73,7 @@ router.get('/stream', async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
@@ -87,6 +88,7 @@ router.get('/stream', async (req, res) => {
     let lastDataAt = Date.now();
     let keepAlive;
     let watchdog;
+    let poller;
 
     try {
         provider = getWsProvider(network);
@@ -135,49 +137,52 @@ router.get('/stream', async (req, res) => {
             // Don't send error to frontend immediately to allow auto-reconnect attempt
         });
 
-        // Block Fallback: If pending is silent, pull transactions from new blocks
-        provider.on('block', async (blockNumber) => {
-            console.log(`[live] New block on ${network}: ${blockNumber}`);
+        // Block Processing Function
+        const processBlock = async (blockNumber) => {
+            if (!blockNumber) return;
+            console.log(`[live] Processing block ${blockNumber} on ${network}...`);
             lastDataAt = Date.now();
-
             try {
-                // Get block with transactions
                 const block = await provider.getBlock(blockNumber, true);
                 if (!block || !block.transactions) return;
 
                 const txs = block.transactions;
-                console.log(`[live] ${network} block ${blockNumber} contains ${txs.length} transactions`);
+                console.log(`[live] ${network} block ${blockNumber}: streaming ${txs.length} txs`);
 
-                // Limit fallback to 20 txs to avoid overwhelming the stream
-                const subset = txs.slice(0, 20);
-
-                for (const tx of subset) {
+                for (const tx of txs.slice(0, 15)) {
                     const { score, reasons } = computeRiskScore(tx);
                     const risk = classifyRisk(score);
-
                     send({
                         type: 'tx',
                         hash: tx.hash,
                         from: tx.from,
                         to: tx.to,
-                        value: tx.value?.toString() || '0',
                         value_eth: parseFloat(ethers.formatEther(tx.value || 0n)).toFixed(6),
-                        gas_limit: tx.gasLimit?.toString(),
-                        data: tx.data?.slice(0, 66) || '0x',
-                        has_data: (tx.data?.length || 0) > 2,
-                        known_contract: KNOWN_CONTRACTS[tx.to?.toLowerCase()] || null,
                         risk_score: score,
                         risk_level: risk,
                         risk_reasons: reasons,
                         network,
-                        is_finalized: true, // Mark as block-confirmed
-                        timestamp: new Date().toISOString(),
+                        is_finalized: true,
                     });
                 }
-            } catch (bErr) {
-                console.error(`[live] Error processing block ${blockNumber}:`, bErr.message);
+            } catch (e) {
+                console.error(`[live] Block sync error: ${e.message}`);
             }
-        });
+        };
+
+        provider.on('block', processBlock);
+
+        // Polling Fallback: Check for new block every 15s in case WS is silent
+        let lastPolledBlock = 0;
+        poller = setInterval(async () => {
+            try {
+                const currentBlock = await provider.getBlockNumber();
+                if (currentBlock > lastPolledBlock) {
+                    if (lastPolledBlock > 0) await processBlock(currentBlock);
+                    lastPolledBlock = currentBlock;
+                }
+            } catch (_) { }
+        }, 15000);
 
         // Watchdog: If no data (no pending AND no blocks) for some time, signal an error to trigger frontend retry
         watchdog = setInterval(() => {
@@ -207,6 +212,7 @@ router.get('/stream', async (req, res) => {
         console.log(`[live] Client disconnected from ${network} stream (${txCount} tx sent)`);
         if (keepAlive) clearInterval(keepAlive);
         if (watchdog) clearInterval(watchdog);
+        if (poller) clearInterval(poller);
         try {
             if (provider) {
                 if (provider._interval) clearInterval(provider._interval);

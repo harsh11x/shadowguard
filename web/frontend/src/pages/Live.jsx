@@ -108,9 +108,11 @@ export default function Live() {
                     setIsStreaming(true)
                     setStatus(data.message || 'Connected')
                 } else if (data.type === 'tx') {
-                    // Infinite Scroll: No slice
+                    setIsStreaming(true) // Ensure status flips on data
                     setTxs(prev => [data, ...prev])
                     setCount(c => c + 1)
+                } else if (data.type === 'ping') {
+                    // console.debug('ping received');
                 } else if (data.type === 'error') {
                     setStatus(`Error: ${data.message}`)
                     setIsStreaming(false)
