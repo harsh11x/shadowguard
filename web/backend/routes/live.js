@@ -123,20 +123,22 @@ router.get('/stream', async (req, res) => {
 
         provider.on('error', (err) => {
             console.error(`[live-ws] ${network} error:`, err.message);
-            send({ type: 'error', message: 'WebSocket error: ' + err.message });
+            // Don't send error to frontend immediately to allow auto-reconnect attempt
         });
 
-        // Watchdog: If no data for 2 minutes on a busy network, signal an error to trigger frontend retry
+        // Watchdog: If no data for some time, signal an error to trigger frontend retry
         const watchdog = setInterval(() => {
             const idleTime = Date.now() - lastDataAt;
-            if (idleTime > 120000 && txCount > 0) {
-                console.warn(`[live] ${network} stream stalled (no data for 120s). Triggering retry.`);
-                send({ type: 'error', message: 'Stream stalled — reconnecting...' });
+            const isQuietNetwork = ['sepolia'].includes(network);
+            const timeout = isQuietNetwork ? 300000 : 45000; // 45s for busy networks
+
+            if (idleTime > timeout) {
+                console.warn(`[live] ${network} stream stalled (no data for ${timeout / 1000}s). Triggering retry.`);
                 res.end(); // Closing the response triggers EventSource auto-retry
             }
-        }, 30000);
+        }, 15000);
 
-        // Keep-alive ping every 30s to prevent SSE timeout
+        // Keep-alive ping every 15s to prevent SSE timeout
         const keepAlive = setInterval(() => {
             send({ type: 'ping', timestamp: new Date().toISOString() });
         }, 15000);

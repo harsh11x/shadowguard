@@ -12,7 +12,7 @@ const CHAIN_CONFIGS = {
         name: 'Ethereum Mainnet',
         symbol: 'ETH',
         rpcHttp: process.env.ETH_RPC_URL || 'https://eth.llamarpc.com',
-        rpcWs: process.env.ETH_WS_URL || 'wss://eth.llamarpc.com',
+        rpcWs: (process.env.ETH_WS_URL || 'wss://eth.llamarpc.com,wss://ethereum-rpc.publicnode.com,wss://eth.drpc.org').split(','),
         explorer: 'https://etherscan.io',
     },
     sepolia: {
@@ -20,7 +20,7 @@ const CHAIN_CONFIGS = {
         name: 'Ethereum Sepolia',
         symbol: 'ETH',
         rpcHttp: process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
-        rpcWs: process.env.SEPOLIA_WS_URL || 'wss://ethereum-sepolia-rpc.publicnode.com',
+        rpcWs: (process.env.SEPOLIA_WS_URL || 'wss://ethereum-sepolia-rpc.publicnode.com').split(','),
         explorer: 'https://sepolia.etherscan.io',
     },
     polygon: {
@@ -28,7 +28,7 @@ const CHAIN_CONFIGS = {
         name: 'Polygon',
         symbol: 'MATIC',
         rpcHttp: process.env.POLYGON_RPC_URL || 'https://polygon.llamarpc.com',
-        rpcWs: process.env.POLYGON_WS_URL || 'wss://polygon.llamarpc.com',
+        rpcWs: (process.env.POLYGON_WS_URL || 'wss://polygon.llamarpc.com,wss://polygon-bor-rpc.publicnode.com').split(','),
         explorer: 'https://polygonscan.com',
     },
     bsc: {
@@ -36,7 +36,7 @@ const CHAIN_CONFIGS = {
         name: 'BNB Smart Chain',
         symbol: 'BNB',
         rpcHttp: process.env.BSC_RPC_URL || 'https://binance.llamarpc.com',
-        rpcWs: process.env.BSC_WS_URL || 'wss://binance.llamarpc.com',
+        rpcWs: (process.env.BSC_WS_URL || 'wss://binance.llamarpc.com,wss://bsc-rpc.publicnode.com').split(','),
         explorer: 'https://bscscan.com',
     },
     arbitrum: {
@@ -44,7 +44,7 @@ const CHAIN_CONFIGS = {
         name: 'Arbitrum One',
         symbol: 'ETH',
         rpcHttp: process.env.ARB_RPC_URL || 'https://arbitrum.llamarpc.com',
-        rpcWs: process.env.ARB_WS_URL || 'wss://arbitrum.llamarpc.com',
+        rpcWs: (process.env.ARB_WS_URL || 'wss://arbitrum.llamarpc.com,wss://arbitrum-one-rpc.publicnode.com').split(','),
         explorer: 'https://arbiscan.io',
     },
 };
@@ -60,12 +60,22 @@ function getHttpProvider(network = 'ethereum') {
     return _httpProviders[network];
 }
 
+const _wsRotator = {};
+
 // WebSocket providers with heartbeats and auto-reconnect logic
 function getWsProvider(network = 'ethereum') {
     const cfg = CHAIN_CONFIGS[network] || CHAIN_CONFIGS.ethereum;
 
+    // Pick an endpoint (round-robin)
+    if (_wsRotator[network] === undefined) _wsRotator[network] = 0;
+    const urls = Array.isArray(cfg.rpcWs) ? cfg.rpcWs : [cfg.rpcWs];
+    const url = urls[_wsRotator[network] % urls.length];
+    _wsRotator[network]++;
+
+    console.log(`[ws] Connecting to ${network} via ${url}...`);
+
     // Use a custom provider that handles heartbeats
-    const provider = new ethers.WebSocketProvider(cfg.rpcWs);
+    const provider = new ethers.WebSocketProvider(url);
 
     // Monitor the underlying websocket
     const socket = provider.websocket;
