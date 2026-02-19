@@ -143,7 +143,9 @@ router.get('/stream', async (req, res) => {
         try {
             if (provider) {
                 provider.removeAllListeners();
-                provider.destroy();
+                if (typeof provider.destroy === 'function') {
+                    provider.destroy();
+                }
             }
         } catch (_) { }
     });
