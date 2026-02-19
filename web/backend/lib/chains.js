@@ -80,10 +80,14 @@ function getWsProvider(network = 'ethereum') {
             console.error(`[ws] ${network} connection error:`, err.message);
         };
 
-        // Keep-alive heartbeat (if supported by node)
-        const pingInterval = setInterval(() => {
-            if (socket.readyState === 1) { // OPEN
-                socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 999 }));
+        // Keep-alive heartbeat (using provider's own logic to avoid ID collisions)
+        const pingInterval = setInterval(async () => {
+            try {
+                if (socket.readyState === 1) {
+                    await provider.getBlockNumber();
+                }
+            } catch (e) {
+                // Silently handle heartbeat errors to prevent feed crashes
             }
         }, 15000);
 
