@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import Simulate from './pages/Simulate.jsx'
@@ -9,7 +10,7 @@ import Live from './pages/Live.jsx'
 import Developer from './pages/Developer.jsx'
 import Admin from './pages/Admin.jsx'
 import AdminLogin from './pages/AdminLogin.jsx'
-
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 function NetworkBar() {
     const [net, setNet] = useState(null)
@@ -35,7 +36,6 @@ function NetworkBar() {
             ) : net && !net.error ? (
                 <>
                     <span className="dim">{net.name || 'MAINNET'}</span>
-
                     <span>#{net.block?.toLocaleString()}</span>
                     <span className="dim">|</span>
                     <span>{net.gas_price_gwei} Gwei</span>
@@ -61,18 +61,6 @@ function Sidebar() {
         { to: '/admin', icon: '🛡️', label: 'Admin Panel' },
     ]
 
-    // Check if user is admin (simple client-side check, protected by backend)
-    const token = localStorage.getItem('sg_dev_token');
-    let isAdmin = false;
-    if (token) {
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            // We need to fetch the user role from endpoint or rely on payload if we added it there.
-            // For now, let's just fetch it or assume if they can access /admin it works.
-            // Better: Add "Admin" link always, let the page handle 403.
-        } catch (e) { }
-    }
-
     return (
         <aside className="sidebar">
             <div className="sidebar-section">
@@ -88,7 +76,6 @@ function Sidebar() {
                         {n.label}
                     </NavLink>
                 ))}
-
             </div>
 
             <div className="sidebar-section">
@@ -105,7 +92,6 @@ function Sidebar() {
                 <div className="sidebar-label">Quick Links</div>
                 <div style={{ padding: '0 8px', fontSize: '0.7rem', lineHeight: 2 }}>
                     <a href="https://etherscan.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)', textDecoration: 'none' }}>⬡ Etherscan ↗</a><br />
-
                     <a href="/api/health" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)', textDecoration: 'none' }}>⬡ API Health ↗</a><br />
                     <a href="/api/export?format=csv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)', textDecoration: 'none' }}>⬡ Export CSV ↗</a>
                 </div>
@@ -114,40 +100,51 @@ function Sidebar() {
     )
 }
 
-import ErrorBoundary from './components/ErrorBoundary.jsx'
+function MainLayout({ children }) {
+    const location = useLocation();
+    const isLogin = location.pathname === '/admin/login';
+
+    if (isLogin) return <>{children}</>;
+
+    return (
+        <div className="app">
+            <header className="header">
+                <NavLink to="/" className="header-logo">
+                    <div className="header-logo-mark">SG</div>
+                    <div>
+                        <div className="header-logo-text">SHADOWGUARD</div>
+                        <div className="header-logo-sub">Pre-Execution Security Proxy · Ethereum Sepolia</div>
+                    </div>
+                </NavLink>
+                <NetworkBar />
+            </header>
+            <div className="main-content">
+                <Sidebar />
+                <main>
+                    {children}
+                </main>
+            </div>
+        </div>
+    );
+}
 
 function App() {
     return (
         <BrowserRouter>
             <ErrorBoundary>
-                <div className="app">
-                    <header className="header">
-                        <NavLink to="/" className="header-logo">
-                            <div className="header-logo-mark">SG</div>
-                            <div>
-                                <div className="header-logo-text">SHADOWGUARD</div>
-                                <div className="header-logo-sub">Pre-Execution Security Proxy · Ethereum Sepolia</div>
-                            </div>
-                        </NavLink>
-                        <NetworkBar />
-                    </header>
-                    <div className="main-content">
-                        <Sidebar />
-                        <main>
-                            <Routes>
-                                <Route path="/" element={<Simulate />} />
-                                <Route path="/live" element={<Live />} />
-                                <Route path="/dashboard" element={<Dashboard />} />
-                                <Route path="/history" element={<History />} />
-                                <Route path="/inspector" element={<Inspector />} />
-                                <Route path="/policy" element={<Policy />} />
-                                <Route path="/developer" element={<Developer />} />
-                                <Route path="/admin" element={<Admin />} />
-                                <Route path="/admin/login" element={<AdminLogin />} />
-                            </Routes>
-                        </main>
-                    </div>
-                </div>
+                <MainLayout>
+                    <Routes>
+                        <Route path="/" element={<Simulate />} />
+                        <Route path="/live" element={<Live />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/history" element={<History />} />
+                        <Route path="/inspector" element={<Inspector />} />
+                        <Route path="/policy" element={<Policy />} />
+                        <Route path="/developer" element={<Developer />} />
+                        <Route path="/admin" element={<Admin />} />
+                        <Route path="/admin/login" element={<AdminLogin />} />
+                    </Routes>
+                </MainLayout>
             </ErrorBoundary>
         </BrowserRouter>
     )
